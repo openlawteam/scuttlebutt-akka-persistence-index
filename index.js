@@ -6,6 +6,7 @@ exports.version = require('./package.json').version
 
 exports.manifest = {
     currentPersistenceIds: 'source',
+    currentPersistenceIdsAsync: 'async',
     livePersistenceIds: 'source'
 }
 
@@ -39,6 +40,9 @@ exports.init = (ssb, config) => {
     return {
         currentPersistenceIds: () => {
             return pull(view.stream({live: false}), pull.flatten())
+        },
+        currentPersistenceIdsAsync: (cb) => {
+            view.get(cb)
         },
         livePersistenceIds: () => {
             return pull(view.stream({live: true}), pull.flatten(), pull.unique(), pull.filter(item => !item.sync))
