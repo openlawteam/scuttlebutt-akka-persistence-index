@@ -39,7 +39,8 @@ describe("Auth keys functionality", function() {
             }
         });
     
-        var newKeys = ssbKeys.generate();
+        // Fake key for the purposes of this test
+        var newKeys = Math.random().toString(36).substring(10);
 
         var persistenceId = "test-persistence-id";
     

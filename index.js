@@ -1,72 +1,49 @@
 const pull = require('pull-stream');
-const FlumeReduce = require('flumeview-reduce');
+
+const PersistenceIdsIndex = require('./persistenceIdsIndex');
 
 exports.name = 'akka-persistence-index'
+
 exports.version = require('./package.json').version
 
 exports.manifest = {
     currentPersistenceIds: 'source',
     currentPersistenceIdsAsync: 'async',
-    livePersistenceIds: 'source'
+    livePersistenceIds: 'source',
+
+    eventsByPersistenceId: 'source',
+    highestSequenceNumber: 'async',
+    persistEvent: 'async'
 }
 
 const indexVersion = 1;
 
 exports.init = (ssb, config) => {
-    const view = ssb._flumeUse('akka-persistence-index',
-        FlumeReduce(
-        indexVersion,
-        flumeReduceFunction,
-        flumeMapFunction)
-    )
 
-    function flumeReduceFunction(index, persistenceId) {
-
-        if (!index) index = []
-
-        if (!index.includes(persistenceId)) {
-            index.push(persistenceId)
-        }
-
-        return index;
-    }
-
-    function flumeMapFunction(item) {
-        // If this is a akka persistence type message, we return it - if there isn't, the reducer isn't ran for 'undefined'
-        // values
-        return item.value.content['persistenceId'];
-    }
-
-    /**
-     * Returns a list of strings (the current persistenceIds) of which the user can see some or all of the 
-     * updates for. If the user had a key for some of the updates, but access is revoked, they will receive that
-     * ID as part of this list but not be able to query for further updates than they had the key for.
-     */
-    function currentPersistenceIdsAsync() {
-
-    }
+    const persistenceIdsIndex = PersistenceIdsIndex(sbot, '@' + config.keys.public);
 
     /**
      * The decrypted stream of events persisted for the given entity ID, up to the last sequence number visible
      * to the user.
      * 
+     * @param {*} authorId the author of the events (or ourselves if null.)
      * @param {*} persistenceId the peristence ID of the entity
      * @param {*} fromSequenceNumber the start sequence number to stream from
      * @param {*} toSequenceNumber the maximum sequence number to stream up to (stream ends early if the last item has a smaller
      * sequence number than this.)
      */
-    function eventsByPersistenceId(persistenceId, fromSequenceNumber, toSequenceNumber) {
+    function eventsByPersistenceId(authorId, persistenceId, fromSequenceNumber, toSequenceNumber) {
 
     }
 
     /**
-     * Returns the highest sequence number of an entity by sequence number that
-     * is visible to the user (they may have been removed from the access list at
-     * some point.)
+     * Returns the highest sequence number of an entity by sequence number for
+     * an entity someone has authored
      * 
+     * @param {*} authorId the author of the events (or ourselves if null.)
      * @param {*} persistenceId the persistence ID of the entity
      */
-    function highestSequenceNumber(persistenceId) {
+    function highestSequenceNumber(authorId, persistenceId) {
 
     }
 
@@ -113,14 +90,18 @@ exports.init = (ssb, config) => {
     }
 
     return {
+        eventsByPersistenceId: eventsByPersistenceId,
+        highestSequenceNumber, highestSequenceNumber,
+        persistEvent: persistEvent,
+
         currentPersistenceIds: () => {
-            return pull(view.stream({live: false}), pull.flatten())
+            return persistenceIdsIndex.currentPersistenceIds();
         },
         currentPersistenceIdsAsync: (cb) => {
-            view.get(cb)
+            return persistenceIdsIndex.currentPersistenceIdsAsync(cb);
         },
         livePersistenceIds: () => {
-            return pull(view.stream({live: true}), pull.flatten(), pull.unique(), pull.filter(item => !item.sync))
+            return persistenceIdsIndex.livePersistenceIds();
         }
     }
 
