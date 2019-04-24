@@ -1,6 +1,7 @@
-const pull = require('pull-stream');
-
 const PersistenceIdsIndex = require('./persistenceIdsIndex');
+const EntityEventsIndex = require('./entityEventsIndex');
+
+const AccessIndex = require('./auth/index');
 
 exports.name = 'akka-persistence-index'
 
@@ -20,7 +21,9 @@ const indexVersion = 1;
 
 exports.init = (ssb, config) => {
 
-    const persistenceIdsIndex = PersistenceIdsIndex(sbot, '@' + config.keys.public);
+    const persistenceIdsIndex = PersistenceIdsIndex(ssb, '@' + config.keys.public);
+    const accessIndex = AccessIndex(ssb, config);
+    const entityEventsIndex = EntityEventsIndex(ssb, '@' + config.keys.public);
 
     /**
      * The decrypted stream of events persisted for the given entity ID, up to the last sequence number visible
@@ -33,6 +36,14 @@ exports.init = (ssb, config) => {
      * sequence number than this.)
      */
     function eventsByPersistenceId(authorId, persistenceId, fromSequenceNumber, toSequenceNumber) {
+        const encryptedSource = entityEventsIndex.eventsByPersistenceId(authorId, persistenceId, fromSequenceNumber, toSequenceNumber);
+
+        // TODO: decryption would go here as a stream map.
+
+        return encryptedSource;
+    }
+
+    function decrypt(message) {
 
     }
 
@@ -44,7 +55,7 @@ exports.init = (ssb, config) => {
      * @param {*} persistenceId the persistence ID of the entity
      */
     function highestSequenceNumber(authorId, persistenceId) {
-
+        return entityEventsIndex.highestSequenceNumber(authorId, persistenceId);
     }
 
     /**
@@ -91,7 +102,7 @@ exports.init = (ssb, config) => {
 
     return {
         eventsByPersistenceId: eventsByPersistenceId,
-        highestSequenceNumber, highestSequenceNumber,
+        highestSequenceNumber: highestSequenceNumber,
         persistEvent: persistEvent,
 
         currentPersistenceIds: () => {
