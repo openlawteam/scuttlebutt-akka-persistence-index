@@ -89,6 +89,43 @@ describe("Auth keys functionality", function() {
 
     });
 
+    describe("Test that the access index keeps track of who we have given keys to.", function () {
+
+        // publish the access update to ourselves
+
+        const sbot = createSbot("test3", pietKeys);
+
+        const persistenceId = "test-persistence-id";
+
+        const auth = Auth(sbot, {
+            keys: {
+                public: pietKeys.public
+            }
+        });
+
+        auth.trackAddUser(persistenceId, '@' + katieKeys.public).then(
+            () => {
+                return auth.usersWeHaveGivenAccessTo(persistenceId).then(users => {
+                    const includesKatie = users.includes('@' + katieKeys.public);
+                    assert.equal(includesKatie, true, "Access list should include katie.");
+        
+                }).then( () => {
+
+                    return auth.trackRemoveUser(persistenceId, '@' + katieKeys.public).then(() => {
+                        auth.usersWeHaveGivenAccessTo(persistenceId).then( users => {
+                            const includesKatie = users.includes('@' + katieKeys.public);
+
+                            assert.equal(includesKatie, true, "Access list should not include katie.");
+                        })  
+                    })
+        
+                });
+            }
+        ).finally(() => sbot.close());
+    });
+
+
+
 });
 
 

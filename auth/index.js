@@ -6,13 +6,6 @@ const R = require('ramda');
 
 const promisify = require('bluebird').promisify;
 
-exports.manifest = {
-    'sendKeys': 'async',
-    'sendUpdatedKey': 'async',
-    'getAllKeysFor': 'async',
-    'getMyCurrentKeyFor': 'async'
-};
-
 module.exports = (sbot, config) => {
 
     const maxUsersPrivateMessagesAtOnce = 7;
@@ -22,6 +15,8 @@ module.exports = (sbot, config) => {
     const keysIndex = KeysIndex(sbot, myKey);
     const accessIndex = AccessIndex(sbot, myKey);
 
+    const publishPrivate = promisify(sbot.private.publish);
+
     function sendKeys(userIds, persistenceId, keys) {
 
         const content = {
@@ -29,8 +24,6 @@ module.exports = (sbot, config) => {
             "persistenceId": persistenceId,
             "keys": keys
         }
-
-        const publishPrivate = promisify(sbot.private.publish);
 
         return publishPrivate(content, userIds);
     }
@@ -57,6 +50,34 @@ module.exports = (sbot, config) => {
     }
 
     return {
+
+        /**
+         * Track that we've removed a user to the list of people who can access the given persistence ID
+         * by sending ourselves the note as a private message.         */
+        trackAddUser: (persistenceId, userId) => {
+            const grantAccessContent = {
+                "type": constants.grantAccessMessageType,
+                "persistenceId": persistenceId,
+                "userId": userId
+            };
+
+            return publishPrivate(grantAccessContent, [myKey]);
+        },
+
+        /**
+         * Track that we've removed a user to the list of people who can access the given persistence ID
+         * by sending ourselves the note as a private message.
+         */
+        trackRemoveUser: (persistenceId, userId) => {
+            const revokeAccessContent = {
+                "type": constants.revokeAccessMessageType,
+                "persistenceId": persistenceId,
+                "userId": userId
+            };
+
+            return publishPrivate(revokeAccessContent, [myKey]);
+        },
+
         /**
          * Shares the updated access key to the list of users who are indexed to be granted access to
          * the given persistence ID. Note: the access list always contains ourselves.
@@ -104,6 +125,10 @@ module.exports = (sbot, config) => {
          */
         getMyCurrentKeyFor: (persistenceId) => {
             return keysIndex.getMyCurrentKeyFor(persistenceId);
+        },
+
+        usersWeHaveGivenAccessTo: (persistenceId) => {
+            return accessIndex.usersWhoHaveAccessTo(persistenceId);
         }
 
     }

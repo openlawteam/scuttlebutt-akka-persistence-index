@@ -112,22 +112,6 @@ exports.init = (ssb, config) => {
 
     }
 
-
-    const persistenceId = 'template-history-...';
-    pull(index.read({
-        gte: [persistenceId, 0],
-        lte: [persistenceId, 10],
-        keys: true // Include the index keys
-    }), pull.map( msg => {
-        var sequenceNr = msg.key[1]; // The sequence number
-        const encryptedContent = msg.value.content;
-
-        return decryptContent(peristenceId, sequenceNr, encryptedContent);
-    }))
-
-
-
-
     return {
         currentPersistenceIds: () => {
             return pull(view.stream({live: false}), pull.flatten())

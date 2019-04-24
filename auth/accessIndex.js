@@ -14,6 +14,7 @@ module.exports = (sbot, myIdent) => {
     const index = sbot._flumeUse('akka-persistence-access-index', FlumeviewReduce(indexVersion, reduce, map));
     
     function map(message) {
+
         const messageType = message.value.content.type;
         const persistenceId = message.value.content.persistenceId;
 
@@ -22,7 +23,8 @@ module.exports = (sbot, myIdent) => {
         if (!authorIsMe) {
             return ;
         } else if (messageType === constants.grantAccessMessageType) {
-            const userId = message.value.content.payload.userId;
+
+            const userId = message.value.content.userId;
 
             return {
                 userId,
@@ -32,7 +34,7 @@ module.exports = (sbot, myIdent) => {
             }
 
         } else if (messageType === constants.revokeAccessMessageType) {
-            const userId = message.value.content.payload.userId;
+            const userId = message.value.content.userId;
 
             return {
                 userId,
@@ -56,10 +58,15 @@ module.exports = (sbot, myIdent) => {
             persistenceIdAccessList.push(message.userId);
         }
         else if (message.revoke) {
-            persistenceIdAccessList.remove(message.userId);
+            var index = persistenceIdAccessList.findIndex(item => item === message.userId);
+            if (index) {
+                persistenceIdAccessList.splice(index, 1);
+            }
         }
 
         state[message.persistenceId] = persistenceIdAccessList;
+
+        return state;
     }
 
     return {
