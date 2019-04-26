@@ -89,9 +89,13 @@ exports.init = (ssb, config) => {
     }
 
     function getKeyForSequenceNr(keyList, sequenceNr) {
-        console.log(keyList);
-        console.log(sequenceNr);
-        return keyList.find(key => key.startSequenceNr >= sequenceNr);
+        const result = keyList.find( (key, index) => {
+            const keyLessThanSequence = key.startSequenceNr <= sequenceNr;
+            const nextKeySequenceNrItem = keyList[index + 1] ? keyList[index + 1].startSequenceNr : null;
+            return keyLessThanSequence && nextKeySequenceNrItem == null || (nextKeySequenceNrItem > sequenceNr);         
+        });
+
+        return result;
     }
 
     /**

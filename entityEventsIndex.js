@@ -51,9 +51,6 @@ module.exports = (sbot, myKey) => {
             } else {
                 const lastItem = result[result.length - 1];
 
-                console.log("last item");
-                console.log(lastItem);
-
                 cb(null, lastItem.value.content.sequenceNr);
             }
         }));

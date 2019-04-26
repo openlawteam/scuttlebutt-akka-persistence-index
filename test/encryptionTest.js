@@ -64,19 +64,37 @@ describe("Test encryption and decryption functionality", function () {
               "type": "akka-persistence-message"
             }
 
-        sbot.akkaPersistenceIndex.persistEvent(setKeysEvent, (err, result) => {
-
-            if (err) {
-                assert.fail(err);
-            } else {
-
-                const stream = sbot.akkaPersistenceIndex.eventsByPersistenceId('@' + pietKeys.public, 'sample-id-6', 1, 100);
-
-                pull(stream, pull.drain((event) => {
-                    console.log(event);
-                }));
-
+            const nextEvent = {
+                "payload": {
+                    "random": "stuff",
+                    },
+                    "sequenceNr": 2,
+                    "persistenceId": "sample-id-6",
+                    "manifest": "random.class.name",
+                    "deleted": false,
+                    "sender": null,
+                    "writerUuid": "b73a85f3-8ca5-49ad-8405-9b5d886703e2",
+                    "type": "akka-persistence-message"
             }
+
+        
+
+        sbot.akkaPersistenceIndex.persistEvent(setKeysEvent, (err, result) => {
+            sbot.akkaPersistenceIndex.persistEvent(nextEvent, (err2, res2) => {
+                if (err || err2) {
+                    assert.fail(err);
+                } else {
+    
+                    const stream = sbot.akkaPersistenceIndex.eventsByPersistenceId('@' + pietKeys.public, 'sample-id-6', 1, 100);
+    
+                    pull(stream, pull.collect((err, results) => {
+                        assert.equal(results.length, 2, "Should be two items in the stream.");
+
+                        sbot.close();
+                    }));
+    
+                }
+            });
 
         });
 
