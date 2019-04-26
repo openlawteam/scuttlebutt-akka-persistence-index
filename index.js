@@ -1,7 +1,12 @@
+const crypto = require('crypto');
+const promisify = require('bluebird').promisify;
+const pull = require('pull-stream');
+
 const PersistenceIdsIndex = require('./persistenceIdsIndex');
 const EntityEventsIndex = require('./entityEventsIndex');
-
 const AccessIndex = require('./auth/index');
+
+const Defer = require('pull-defer')
 
 exports.name = 'akka-persistence-index'
 
@@ -21,9 +26,18 @@ const indexVersion = 1;
 
 exports.init = (ssb, config) => {
 
+    const encryptionAlgorithm = 'aes';
+
     const persistenceIdsIndex = PersistenceIdsIndex(ssb, '@' + config.keys.public);
+
     const accessIndex = AccessIndex(ssb, config);
     const entityEventsIndex = EntityEventsIndex(ssb, '@' + config.keys.public);
+
+    const setKeyType = "";
+    const addUserType = "";
+    const removeUserType = "";
+
+    const postPublicMessage = promisify(ssb.publish);
 
     /**
      * The decrypted stream of events persisted for the given entity ID, up to the last sequence number visible
@@ -38,13 +52,47 @@ exports.init = (ssb, config) => {
     function eventsByPersistenceId(authorId, persistenceId, fromSequenceNumber, toSequenceNumber) {
         const encryptedSource = entityEventsIndex.eventsByPersistenceId(authorId, persistenceId, fromSequenceNumber, toSequenceNumber);
 
-        // TODO: decryption would go here as a stream map.
+        const decryptionThrough = Defer.through();
 
-        return encryptedSource;
+        const keysForPersistenceId = accessIndex.getAllKeysFor(persistenceId, authorId || '@' + config.keys.public);
+
+        keysForPersistenceId.then(keys => {
+            const through = pull.map(message => decrypt(keys, message));
+            decryptionThrough.resolve(through);
+        });
+
+
+        return pull(encryptedSource, decryptionThrough)
     }
 
-    function decrypt(message) {
+    function decrypt(keyList, message) {
 
+        if (!message.encrypted) {
+            return message;
+        } else {
+            const sequenceNr = message.sequenceNr;
+            const keyInfo = getKeyForSequenceNr(keyList, sequenceNr);
+
+            const ivBase64 = keyInfo.key.iv;
+            const keyBase64 = keyInfo.key.key;
+
+            const iv = Buffer.from(ivBase64, 'base64')
+            const key = Buffer.from(keyBase64, 'base64');
+            const decipher = crypto.createDecipheriv(encryptionAlgorithm, key, iv);
+            const bytes = Buffer.from(message.payload);
+            const decryptedText = Buffer.concat([decipher.update(bytes), decipher.final()]);
+
+            const payloadObj = JSON.parse(decryptedText);
+
+            message.payload = payloadObj;
+
+            return payloadObj;
+        }
+
+    }
+
+    function getKeyForSequenceNr(keyList, sequenceNr) {
+        return keyList.find(key => key.sequenceNr >= sequenceNr);
     }
 
     /**
@@ -96,8 +144,92 @@ exports.init = (ssb, config) => {
      * @param {*} persistedMessage expected to follow the schema of a PersistentRepr in akka
      * (https://doc.akka.io/japi/akka/current/akka/persistence/PersistentRepr.html)
      */
-    function persistEvent(persistenceId, persistedMessage) {
+    function persistEvent(persistedMessage, cb) {
 
+        if (validateMessage(persistedMessage, cb)) {
+            if (persistedMessage.manifest === setKeyType) {
+                accessIndex.sendUpdatedKey(
+                    persistedMessage.persistenceId,
+                    persistedMessage.payload.key,
+                ).then(
+                    () => publishWithKey(persistedMessage)
+                ).asCallback(cb);
+    
+            } else if (persistedMessage.manifest === addUserType) {
+                const userId = persistedMessage.payload.userId;
+                const persistenceId = persistedMessage.persistenceId;
+
+                accessIndex.sendKeys(userId, persistenceId)
+                    .then(() => accessIndex.trackAddUser(persistenceId, userId))
+                    .then(() => publishWithKey(persistedMessage))
+                    .asCallback(cb);
+
+            } else if (persistedMessage.manifest === removeUserType) {
+                const userId = persistedMessage.payload.userId;
+                const persistenceId = persistedMessage.persistenceId;
+                const newKey = persistedMessage.payload.newKey;
+                const sequenceNr = persistedMessage.sequenceNr;
+                
+                // Todo: validate the above fields aren't null.
+
+                accessIndex.trackRemoveUser(persistenceId, userId)
+                    .then(() =>
+                        accessIndex.sendUpdatedKey(persistenceId, sequenceNr, newKey)
+                    ).then(
+                        () => publishWithKey(persistedMessage)
+                    ).asCallback(cb);
+    
+            } else {
+                publishWithKey(persistedMessage).asCallback(cb);
+            }
+        }
+    }
+
+    function validateMessage(persistedMessage, cb) {
+        return true;
+    }
+
+    function publishWithKey(persistedMessage) {
+        const currentKey = accessIndex.getMyCurrentKeyFor(persistedMessage.persistenceId);
+        persistedMessage['type'] = "akka-persistence-message";
+
+        return currentKey.then(key => {
+
+            if (key == null) {
+                // This is not an encrypted / private entity, we publish it in plain text.
+                
+                return publish(persistedMessage);
+            } else {
+
+                const payloadAsJsonText = JSON.stringify(persistedMessage.payload);
+
+                const cypherText = encryptWithKey(payloadAsJsonText, key);
+
+                // TODO: deep copy
+                persistedMessage['payload'] = cypherText;
+                persistedMessage['encrypted'] = true;
+
+                return publish(persistedMessage);
+            }
+
+        });
+    }
+
+    function encryptWithKey(payload, keyInfo) {
+        const iv = keyInfo.key.iv;
+        const key = keyInfo.key.key;
+
+        const ivBytes = Buffer.from(iv, 'base64');
+        const keyBytes = Buffer.from(key, 'base64');
+
+        // Note: we don't use an incrementing nonce because we're unlikely to have millions of updates for
+        // a given entity so we shouldn't reach a collision.
+
+        const cipher = crypto.createCipheriv(encryptionAlgorithm, keyBytes, ivBytes);
+
+        const bytes = Buffer.concat(cipher.update(payload), cipher.final())
+
+        return bytes.toString('base64');
     }
 
     return {
@@ -117,7 +249,3 @@ exports.init = (ssb, config) => {
     }
 
 }
-
-
-
-

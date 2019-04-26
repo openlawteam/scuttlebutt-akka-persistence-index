@@ -12,6 +12,7 @@
     "bluebird": "^3.5.3",
     "flumeview-level": "^3.0.8",
     "flumeview-reduce": "^1.3.16",
+    "pull-defer": "^0.2.3",
     "ramda": "^0.26.1",
     "ssb-keys": "^7.1.5"
   },
