@@ -2,6 +2,7 @@ const crypto = require('crypto');
 const promisify = require('bluebird').promisify;
 const pull = require('pull-stream');
 
+const constants = require('./constants');
 const PersistenceIdsIndex = require('./persistenceIdsIndex');
 const EntityEventsIndex = require('./entityEventsIndex');
 const AccessIndex = require('./auth/index');
@@ -26,18 +27,14 @@ const indexVersion = 1;
 
 exports.init = (ssb, config) => {
 
-    const encryptionAlgorithm = 'aes';
+    const encryptionAlgorithm = 'aes-256-ctr';
 
     const persistenceIdsIndex = PersistenceIdsIndex(ssb, '@' + config.keys.public);
 
     const accessIndex = AccessIndex(ssb, config);
     const entityEventsIndex = EntityEventsIndex(ssb, '@' + config.keys.public);
 
-    const setKeyType = "";
-    const addUserType = "";
-    const removeUserType = "";
-
-    const postPublicMessage = promisify(ssb.publish);
+    const publishPublic = promisify(ssb.publish);
 
     /**
      * The decrypted stream of events persisted for the given entity ID, up to the last sequence number visible
@@ -79,8 +76,8 @@ exports.init = (ssb, config) => {
             const iv = Buffer.from(ivBase64, 'base64')
             const key = Buffer.from(keyBase64, 'base64');
             const decipher = crypto.createDecipheriv(encryptionAlgorithm, key, iv);
-            const bytes = Buffer.from(message.payload);
-            const decryptedText = Buffer.concat([decipher.update(bytes), decipher.final()]);
+            const bytes = Buffer.from(message.payload, 'base64');
+            const decryptedText = Buffer.concat([decipher.update(bytes), decipher.final()]).toString();
 
             const payloadObj = JSON.parse(decryptedText);
 
@@ -92,7 +89,9 @@ exports.init = (ssb, config) => {
     }
 
     function getKeyForSequenceNr(keyList, sequenceNr) {
-        return keyList.find(key => key.sequenceNr >= sequenceNr);
+        console.log(keyList);
+        console.log(sequenceNr);
+        return keyList.find(key => key.startSequenceNr >= sequenceNr);
     }
 
     /**
@@ -147,15 +146,17 @@ exports.init = (ssb, config) => {
     function persistEvent(persistedMessage, cb) {
 
         if (validateMessage(persistedMessage, cb)) {
-            if (persistedMessage.manifest === setKeyType) {
+            if (persistedMessage.manifest === constants.setKeyType) {
                 accessIndex.sendUpdatedKey(
                     persistedMessage.persistenceId,
+                    persistedMessage.sequenceNr,
                     persistedMessage.payload.key,
                 ).then(
+                    // We encrypt this message with the new key, after it's been indexed.
                     () => publishWithKey(persistedMessage)
                 ).asCallback(cb);
     
-            } else if (persistedMessage.manifest === addUserType) {
+            } else if (persistedMessage.manifest === constants.addUserType) {
                 const userId = persistedMessage.payload.userId;
                 const persistenceId = persistedMessage.persistenceId;
 
@@ -164,7 +165,7 @@ exports.init = (ssb, config) => {
                     .then(() => publishWithKey(persistedMessage))
                     .asCallback(cb);
 
-            } else if (persistedMessage.manifest === removeUserType) {
+            } else if (persistedMessage.manifest === constants.removeUserType) {
                 const userId = persistedMessage.payload.userId;
                 const persistenceId = persistedMessage.persistenceId;
                 const newKey = persistedMessage.payload.newKey;
@@ -198,7 +199,7 @@ exports.init = (ssb, config) => {
             if (key == null) {
                 // This is not an encrypted / private entity, we publish it in plain text.
                 
-                return publish(persistedMessage);
+                return publishPublic(persistedMessage);
             } else {
 
                 const payloadAsJsonText = JSON.stringify(persistedMessage.payload);
@@ -209,7 +210,7 @@ exports.init = (ssb, config) => {
                 persistedMessage['payload'] = cypherText;
                 persistedMessage['encrypted'] = true;
 
-                return publish(persistedMessage);
+                return publishPublic(persistedMessage);
             }
 
         });
@@ -227,7 +228,9 @@ exports.init = (ssb, config) => {
 
         const cipher = crypto.createCipheriv(encryptionAlgorithm, keyBytes, ivBytes);
 
-        const bytes = Buffer.concat(cipher.update(payload), cipher.final())
+        const payloadAsString = JSON.stringify(payload);
+
+        const bytes = Buffer.concat([cipher.update(payloadAsString), cipher.final()])
 
         return bytes.toString('base64');
     }
