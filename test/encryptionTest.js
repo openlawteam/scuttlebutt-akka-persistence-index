@@ -86,12 +86,26 @@ describe("Test encryption and decryption functionality", function () {
                 } else {
     
                     const stream = sbot.akkaPersistenceIndex.eventsByPersistenceId('@' + pietKeys.public, 'sample-id-6', 1, 100);
-    
-                    pull(stream, pull.collect((err, results) => {
-                        assert.equal(results.length, 2, "Should be two items in the stream.");
 
-                        sbot.close();
-                    }));
+                    sbot.akkaPersistenceIndex.highestSequenceNumber(null, 'sample-id-6', (err, result) => {
+
+                        if (err) {
+                            assert.fail(err);
+                        } else {
+                            assert.equal(result, 2, "Current sequence number should be 2.");
+                        }
+
+
+                        pull(stream, pull.collect((err, results) => {
+                            assert.equal(results.length, 2, "Should be two items in the stream.");
+    
+                            sbot.close();
+                        }));
+
+                    });
+
+    
+
     
                 }
             });

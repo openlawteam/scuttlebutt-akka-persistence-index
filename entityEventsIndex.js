@@ -51,10 +51,9 @@ module.exports = (sbot, myKey) => {
             } else {
                 const lastItem = result[result.length - 1];
 
-                cb(null, lastItem.value.content.sequenceNr);
+                cb(null, lastItem.sequenceNr);
             }
         }));
-
     }
 
     return {

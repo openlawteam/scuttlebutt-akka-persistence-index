@@ -105,8 +105,10 @@ exports.init = (ssb, config) => {
      * @param {*} authorId the author of the events (or ourselves if null.)
      * @param {*} persistenceId the persistence ID of the entity
      */
-    function highestSequenceNumber(authorId, persistenceId) {
-        return entityEventsIndex.highestSequenceNumber(authorId, persistenceId);
+    function highestSequenceNumber(authorId, persistenceId, cb) {
+        authorId = authorId || '@' + config.keys.public;
+
+        return entityEventsIndex.highestSequenceNumber(authorId, persistenceId, cb);
     }
 
     /**
