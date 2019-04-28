@@ -59,7 +59,7 @@ exports.init = (ssb, config) => {
         });
 
 
-        return pull(encryptedSource, decryptionThrough)
+        return pull(encryptedSource, decryptionThrough, pull.filter(decrypted => decrypted != null));
     }
 
     function decrypt(keyList, message) {
@@ -70,6 +70,11 @@ exports.init = (ssb, config) => {
             const sequenceNr = message.sequenceNr;
             const keyInfo = getKeyForSequenceNr(keyList, sequenceNr);
 
+            if (!keyInfo) {
+                // If we don't have a key for it, return null to indicate it can't be decrypted
+                return null;
+            }
+
             const ivBase64 = keyInfo.key.iv;
             const keyBase64 = keyInfo.key.key;
 
@@ -79,11 +84,14 @@ exports.init = (ssb, config) => {
             const bytes = Buffer.from(message.payload, 'base64');
             const decryptedText = Buffer.concat([decipher.update(bytes), decipher.final()]).toString();
 
-            const payloadObj = JSON.parse(decryptedText);
-
-            message.payload = payloadObj;
-
-            return payloadObj;
+            try {
+                const payloadObj = JSON.parse(decryptedText);
+                message.payload = payloadObj;
+                return payloadObj;
+            } catch (ex) {
+                // We may not have been given the necessary keys (having been removed from the access list.)
+                return null;
+            }
         }
 
     }
