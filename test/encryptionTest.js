@@ -34,9 +34,9 @@ describe("Test encryption and decryption functionality", function () {
 
         const sbot = createSbot("test123", pietKeys);
 
-        const iv = crypto.randomBytes(16);
+        const nonce = crypto.randomBytes(5);
 
-        const base64Iv = iv.toString('base64');
+        const base64nonce = nonce.toString('base64');
 
         const ENCRYPTION_KEY = 'Must256bytes(32characters)secret';
         const SALT = 'somethingrandom';
@@ -50,7 +50,7 @@ describe("Test encryption and decryption functionality", function () {
             "payload": {
                 "sequenceNr": 1,
                 "key": {
-                    "iv": base64Iv,
+                    "nonce": base64nonce,
                     "key": keyBase64
                 }
 

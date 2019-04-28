@@ -75,11 +75,15 @@ exports.init = (ssb, config) => {
                 return null;
             }
 
-            const ivBase64 = keyInfo.key.iv;
+            const nonceBase64 = keyInfo.key.nonce;
             const keyBase64 = keyInfo.key.key;
 
-            const iv = Buffer.from(ivBase64, 'base64')
+            const nonce = Buffer.from(nonceBase64, 'base64')
             const key = Buffer.from(keyBase64, 'base64');
+
+            const iv = Buffer.alloc(16);
+            nonce.copy(iv);
+
             const decipher = crypto.createDecipheriv(encryptionAlgorithm, key, iv);
             const bytes = Buffer.from(message.payload, 'base64');
             const decryptedText = Buffer.concat([decipher.update(bytes), decipher.final()]).toString();
@@ -231,11 +235,14 @@ exports.init = (ssb, config) => {
     }
 
     function encryptWithKey(payload, keyInfo) {
-        const iv = keyInfo.key.iv;
+        const nonce = keyInfo.key.nonce;
         const key = keyInfo.key.key;
 
-        const ivBytes = Buffer.from(iv, 'base64');
+        const nonceBytes = Buffer.from(nonce, 'base64');
         const keyBytes = Buffer.from(key, 'base64');
+
+        const ivBytes = Buffer.alloc(16)
+        nonceBytes.copy(ivBytes);
 
         // Note: we don't use an incrementing nonce because we're unlikely to have millions of updates for
         // a given entity so we shouldn't reach a collision.
