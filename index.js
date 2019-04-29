@@ -38,6 +38,8 @@ exports.init = (ssb, config) => {
 
     const publishPublic = promisify(ssb.publish);
 
+    const randomBytes = promisify(crypto.randomBytes);
+
     /**
      * The decrypted stream of events persisted for the given entity ID, up to the last sequence number visible
      * to the user.
@@ -236,13 +238,12 @@ exports.init = (ssb, config) => {
 
                 const payloadAsJsonText = JSON.stringify(persistedMessage.payload);
 
-                const cypherText = encryptWithKey(payloadAsJsonText, key);
-
-                // TODO: deep copy
-                persistedMessage['payload'] = cypherText;
-                persistedMessage['encrypted'] = true;
-
-                return publishPublic(persistedMessage);
+                return encryptWithKey(payloadAsJsonText, key).then(cypherText => {
+                    persistedMessage['payload'] = cypherText;
+                    persistedMessage['encrypted'] = true;
+    
+                    return publishPublic(persistedMessage);
+                })
             }
 
         });
@@ -252,20 +253,20 @@ exports.init = (ssb, config) => {
         const key = keyInfo.key.key;
         const nonceLength = keyInfo.key.nonceLength;
 
-        const nonceBytes = crypto.randomBytes(nonceLength);
+        return randomBytes(nonceLength).then(nonceBytes => {
+            const keyBytes = Buffer.from(key, 'base64');
 
-        const keyBytes = Buffer.from(key, 'base64');
-
-        const ivBytes = Buffer.alloc(IV_LENGTH)
-        nonceBytes.copy(ivBytes);
-
-        const cipher = crypto.createCipheriv(encryptionAlgorithm, keyBytes, ivBytes);
-
-        const payloadAsString = JSON.stringify(payload);
-
-        const bytes = Buffer.concat([nonceBytes, cipher.update(payloadAsString), cipher.final()])
-
-        return bytes.toString('base64');
+            const ivBytes = Buffer.alloc(IV_LENGTH)
+            nonceBytes.copy(ivBytes);
+    
+            const cipher = crypto.createCipheriv(encryptionAlgorithm, keyBytes, ivBytes);
+    
+            const payloadAsString = JSON.stringify(payload);
+    
+            const bytes = Buffer.concat([nonceBytes, cipher.update(payloadAsString), cipher.final()])
+    
+            return bytes.toString('base64');
+        })
     }
 
     function generateKeyBase64() {
