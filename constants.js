@@ -1,3 +1,3 @@
-module.exports.setKeyType = "setKeyType";
-module.exports.addUserType = "addUserType";
-module.exports.removeUserType = "removeUserType";
+module.exports.setKeyType = "org.openlaw.scuttlebutt.persistence.model.UpdateKey";
+module.exports.addUserType = "org.openlaw.scuttlebutt.persistence.model.AllowKey";
+module.exports.removeUserType = "org.openlaw.scuttlebutt.persistence.model.RemoveAccess";
