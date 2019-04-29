@@ -47,6 +47,8 @@ exports.init = (ssb, config) => {
      * sequence number than this.)
      */
     function eventsByPersistenceId(authorId, persistenceId, fromSequenceNumber, toSequenceNumber) {
+        authorId = authorId || '@' + config.keys.public;
+
         const encryptedSource = entityEventsIndex.eventsByPersistenceId(authorId, persistenceId, fromSequenceNumber, toSequenceNumber);
 
         const decryptionThrough = Defer.through();
