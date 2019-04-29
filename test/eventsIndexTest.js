@@ -45,7 +45,7 @@ describe("Entity events index", function() {
                     if (err) {
                         assert.fail(err);
                     } else {
-                        console.log(result);
+                       // console.log(result);
                         assert(10, result.length, 10);
                     }
 

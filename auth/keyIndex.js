@@ -90,7 +90,9 @@ module.exports = (sbot, myKey) => {
          */
         getMyCurrentKeyFor: (persistenceId) => {
             return getAllKeysFor(persistenceId, myKey).then(
-                allKeys => allKeys[allKeys.length -1]
+                allKeys => {
+                    return allKeys[allKeys.length -1]
+                }
             )
         }
     }

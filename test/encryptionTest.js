@@ -12,6 +12,10 @@ const constants = require('../constants');
 
 const pull = require('pull-stream');
 
+const promisify = require('bluebird').promisify;
+
+const Bluebird = require('bluebird');
+
 const IV_LENGTH = 16;
 
 function createSbot(testBotName, keys) {
@@ -34,50 +38,11 @@ describe("Test encryption and decryption functionality", function () {
 
         const sbot = createSbot("test123", pietKeys);
 
-        const nonce = crypto.randomBytes(5);
+        const setKeysEvent = makeRandomSetKeyEvent(1);
 
-        const base64nonce = nonce.toString('base64');
-
-        const ENCRYPTION_KEY = 'Must256bytes(32characters)secret';
-        const SALT = 'somethingrandom';
-
-        const key = crypto.pbkdf2Sync(ENCRYPTION_KEY, SALT, 10000, 32, 'sha512')
-
-        const buffer = Buffer.from(key, 'base64');
-        const keyBase64 = buffer.toString('base64');
-
-        const setKeysEvent = {
-            "payload": {
-                "sequenceNr": 1,
-                "key": {
-                    "nonce": base64nonce,
-                    "key": keyBase64
-                }
-
-              },
-              "sequenceNr": 1,
-              "persistenceId": "sample-id-6",
-              "manifest": constants.setKeyType,
-              "deleted": false,
-              "sender": null,
-              "writerUuid": "b73a85f3-8ca5-49ad-8405-9b5d886703e2",
-              "type": "akka-persistence-message"
-            }
-
-            const nextEvent = {
-                "payload": {
-                    "random": "stuff",
-                    },
-                    "sequenceNr": 2,
-                    "persistenceId": "sample-id-6",
-                    "manifest": "random.class.name",
-                    "deleted": false,
-                    "sender": null,
-                    "writerUuid": "b73a85f3-8ca5-49ad-8405-9b5d886703e2",
-                    "type": "akka-persistence-message"
-            }
-
-        
+        const nextEvent = makeEvent({
+            "key": "value"
+        }, 2);    
 
         sbot.akkaPersistenceIndex.persistEvent(setKeysEvent, (err, result) => {
             sbot.akkaPersistenceIndex.persistEvent(nextEvent, (err2, res2) => {
@@ -112,6 +77,99 @@ describe("Test encryption and decryption functionality", function () {
 
         });
 
+    });
+
+    describe("Continue to decrypt after key changes", function() {
+
+        const sbot = createSbot("test10", pietKeys);
+        const postEvent = promisify(sbot.akkaPersistenceIndex.persistEvent);
+
+        const setKeysEvent = makeRandomSetKeyEvent(1);
+
+        const event1 = makeEvent({
+            "test": "test1"
+        }, 2);
+
+        // Change the keys half way through...
+        const setKeysEvent2 = makeRandomSetKeyEvent(3);
+
+        const event2 = makeEvent({
+            "test": "test2"
+        }, 4)
+
+        const events = [setKeysEvent, event1, setKeysEvent2, event2];
+
+        const posted = Bluebird.each(events, event => {
+            return postEvent(event);
+        });
+
+        posted.then(() => {
+            console.log("hm?")
+
+            const stream = sbot.akkaPersistenceIndex.eventsByPersistenceId('@' + pietKeys.public, 'sample-id-6', 1, 100);
+
+            pull(stream, pull.collect((err, result) => {
+                console.log(result);
+
+                assert.equal(result.length, 4, "there should be 4 events.");
+
+                sbot.close();
+
+            }));
+
+        }).catch(err => console.log(err));
+        
     })
 
 });
+
+function makeRandomSetKeyEvent(sequenceNr) {
+    const nonce = crypto.randomBytes(5);
+
+    const base64nonce = nonce.toString('base64');
+
+    const ENCRYPTION_KEY = crypto.randomBytes(20).toString('hex');
+    const SALT = 'somethingrandom';
+
+    const key = crypto.pbkdf2Sync(ENCRYPTION_KEY, SALT, 10000, 32, 'sha512')
+
+    const buffer = Buffer.from(key, 'base64');
+    const keyBase64 = buffer.toString('base64');
+
+    const setKeysEvent = {
+        "payload": {
+            "sequenceNr": sequenceNr,
+            "key": {
+                "nonce": base64nonce,
+                "key": keyBase64
+            }
+
+          },
+          "sequenceNr": sequenceNr,
+          "persistenceId": "sample-id-6",
+          "manifest": constants.setKeyType,
+          "deleted": false,
+          "sender": null,
+          "writerUuid": "b73a85f3-8ca5-49ad-8405-9b5d886703e2",
+          "type": "akka-persistence-message"
+        }
+
+    return setKeysEvent;
+}
+
+function makeEvent(payload, sequenceNumber) {
+    return {
+        "payload": {
+            payload
+            },
+            "sequenceNr": sequenceNumber,
+            "persistenceId": "sample-id-6",
+            "manifest": "random.class.name",
+            "deleted": false,
+            "sender": null,
+            "writerUuid": "b73a85f3-8ca5-49ad-8405-9b5d886703e2",
+            "type": "akka-persistence-message"
+    }
+
+
+}
