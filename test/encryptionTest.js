@@ -104,7 +104,6 @@ describe("Test encryption and decryption functionality", function () {
         });
 
         posted.then(() => {
-            console.log("hm?")
 
             const stream = sbot.akkaPersistenceIndex.eventsByPersistenceId('@' + pietKeys.public, 'sample-id-6', 1, 100);
 
@@ -124,9 +123,6 @@ describe("Test encryption and decryption functionality", function () {
 });
 
 function makeRandomSetKeyEvent(sequenceNr) {
-    const nonce = crypto.randomBytes(5);
-
-    const base64nonce = nonce.toString('base64');
 
     const ENCRYPTION_KEY = crypto.randomBytes(20).toString('hex');
     const SALT = 'somethingrandom';
@@ -138,12 +134,6 @@ function makeRandomSetKeyEvent(sequenceNr) {
 
     const setKeysEvent = {
         "payload": {
-            "sequenceNr": sequenceNr,
-            "key": {
-                "nonce": base64nonce,
-                "key": keyBase64
-            }
-
           },
           "sequenceNr": sequenceNr,
           "persistenceId": "sample-id-6",

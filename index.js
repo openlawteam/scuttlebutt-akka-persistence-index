@@ -27,6 +27,8 @@ const indexVersion = 1;
 
 exports.init = (ssb, config) => {
 
+    const IV_LENGTH = 16;
+
     const encryptionAlgorithm = 'aes-256-ctr';
 
     const persistenceIdsIndex = PersistenceIdsIndex(ssb, '@' + config.keys.public);
@@ -71,29 +73,33 @@ exports.init = (ssb, config) => {
         } else {
             const sequenceNr = message.sequenceNr;
             const keyInfo = getKeyForSequenceNr(keyList, sequenceNr);
-
             if (!keyInfo) {
                 // If we don't have a key for it, return null to indicate it can't be decrypted
                 return null;
             }
 
-            const nonceBase64 = keyInfo.key.nonce;
-            const keyBase64 = keyInfo.key.key;
+            const nonceLength = keyInfo.key.nonceLength;
+            const nonce = Buffer.alloc(nonceLength);
 
-            const nonce = Buffer.from(nonceBase64, 'base64')
+            const keyBase64 = keyInfo.key.key;
             const key = Buffer.from(keyBase64, 'base64');
 
-            const iv = Buffer.alloc(16);
-            nonce.copy(iv);
+            const bytes = Buffer.from(message.payload, 'base64');
+            bytes.copy(nonce, 0, 0, nonceLength);
+
+            const iv = Buffer.alloc(IV_LENGTH);
+            
+            nonce.copy(iv, 0, 0, nonceLength)
+
+            const encryptedText = bytes.slice(nonceLength)
 
             const decipher = crypto.createDecipheriv(encryptionAlgorithm, key, iv);
-            const bytes = Buffer.from(message.payload, 'base64');
-            const decryptedText = Buffer.concat([decipher.update(bytes), decipher.final()]).toString();
+            const decryptedText = Buffer.concat([decipher.update(encryptedText), decipher.final()]).toString();
 
             try {
                 const payloadObj = JSON.parse(decryptedText);
                 message.payload = payloadObj;
-                return payloadObj;
+                return message;
             } catch (ex) {
                 // We may not have been given the necessary keys (having been removed from the access list.)
                 return null;
@@ -167,10 +173,16 @@ exports.init = (ssb, config) => {
 
         if (validateMessage(persistedMessage, cb)) {
             if (persistedMessage.manifest === constants.setKeyType) {
+
+                const keyInfo = {
+                    key: generateKeyBase64(),
+                    nonceLength: 8
+                }
+
                 accessIndex.sendUpdatedKey(
                     persistedMessage.persistenceId,
                     persistedMessage.sequenceNr,
-                    persistedMessage.payload.key,
+                    keyInfo,
                 ).then(
                     // We encrypt this message with the new key, after it's been indexed.
                     () => publishWithKey(persistedMessage)
@@ -237,25 +249,32 @@ exports.init = (ssb, config) => {
     }
 
     function encryptWithKey(payload, keyInfo) {
-        const nonce = keyInfo.key.nonce;
         const key = keyInfo.key.key;
+        const nonceLength = keyInfo.key.nonceLength;
 
-        const nonceBytes = Buffer.from(nonce, 'base64');
+        const nonceBytes = crypto.randomBytes(nonceLength);
+
         const keyBytes = Buffer.from(key, 'base64');
 
-        const ivBytes = Buffer.alloc(16)
+        const ivBytes = Buffer.alloc(IV_LENGTH)
         nonceBytes.copy(ivBytes);
-
-        // Note: we don't use an incrementing nonce because we're unlikely to have millions of updates for
-        // a given entity so we shouldn't reach a collision.
 
         const cipher = crypto.createCipheriv(encryptionAlgorithm, keyBytes, ivBytes);
 
         const payloadAsString = JSON.stringify(payload);
 
-        const bytes = Buffer.concat([cipher.update(payloadAsString), cipher.final()])
+        const bytes = Buffer.concat([nonceBytes, cipher.update(payloadAsString), cipher.final()])
 
         return bytes.toString('base64');
+    }
+
+    function generateKeyBase64() {
+        const ENCRYPTION_KEY = crypto.randomBytes(20).toString('hex');
+        const SALT = crypto.randomBytes(16);
+    
+        const buffer = crypto.pbkdf2Sync(ENCRYPTION_KEY, SALT, 10000, 32, 'sha512')
+
+        return buffer.toString('base64');
     }
 
     return {
