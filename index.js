@@ -40,6 +40,8 @@ exports.init = (ssb, config) => {
 
     const randomBytes = promisify(crypto.randomBytes);
 
+    const pbkdf2 = promisify(crypto.pbkdf2);
+
     /**
      * The decrypted stream of events persisted for the given entity ID, up to the last sequence number visible
      * to the user.
@@ -174,21 +176,27 @@ exports.init = (ssb, config) => {
     function persistEvent(persistedMessage, cb) {
 
         if (validateMessage(persistedMessage, cb)) {
+        
             if (persistedMessage.manifest === constants.setKeyType) {
 
-                const keyInfo = {
-                    key: generateKeyBase64(),
-                    nonceLength: 8
-                }
+                generateKeyBase64().then(key => {
 
-                accessIndex.sendUpdatedKey(
-                    persistedMessage.persistenceId,
-                    persistedMessage.sequenceNr,
-                    keyInfo,
-                ).then(
-                    // We encrypt this message with the new key, after it's been indexed.
-                    () => publishWithKey(persistedMessage)
-                ).asCallback(cb);
+                    const keyInfo = {
+                        key: key,
+                        nonceLength: 8
+                    }
+                    
+                    return accessIndex.sendUpdatedKey(
+                        persistedMessage.persistenceId,
+                        persistedMessage.sequenceNr,
+                        keyInfo,
+                    ).then(
+                        // We encrypt this message with the new key, after it's been indexed.
+                        () => publishWithKey(persistedMessage)
+                    ).asCallback(cb);
+                    
+                })
+
     
             } else if (persistedMessage.manifest === constants.addUserType) {
                 const userId = persistedMessage.payload.userId;
@@ -236,9 +244,7 @@ exports.init = (ssb, config) => {
                 return publishPublic(persistedMessage);
             } else {
 
-                const payloadAsJsonText = JSON.stringify(persistedMessage.payload);
-
-                return encryptWithKey(payloadAsJsonText, key).then(cypherText => {
+                return encryptWithKey(persistedMessage.payload, key).then(cypherText => {
                     persistedMessage['payload'] = cypherText;
                     persistedMessage['encrypted'] = true;
     
@@ -270,12 +276,13 @@ exports.init = (ssb, config) => {
     }
 
     function generateKeyBase64() {
-        const ENCRYPTION_KEY = crypto.randomBytes(20).toString('hex');
-        const SALT = crypto.randomBytes(16);
-    
-        const buffer = crypto.pbkdf2Sync(ENCRYPTION_KEY, SALT, 10000, 32, 'sha512')
 
-        return buffer.toString('base64');
+        return Promise.all([randomBytes(20), randomBytes(16)]).then(randomBytes => {
+            const encryptionKey = randomBytes[0].toString('hex');
+            const salt = randomBytes[1];
+
+            return pbkdf2(encryptionKey, salt, 10000, 32, 'sha512').then(buffer => buffer.toString('base64'));
+        });
     }
 
     return {
