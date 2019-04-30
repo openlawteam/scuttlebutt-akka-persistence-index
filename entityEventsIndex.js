@@ -1,9 +1,11 @@
 const FlumeviewLevel = require('flumeview-level');
 const pull = require('pull-stream');
 
+const window = require('pull-window');
+
 module.exports = (sbot, myKey) => {
 
-    const version = 1;
+    const version = 2;
 
     const index = sbot._flumeUse('entity-events-index', FlumeviewLevel(version, mapFunction));
 
@@ -15,8 +17,7 @@ module.exports = (sbot, myKey) => {
             const persistenceId = message.value.content.persistenceId;
             const sequenceNr = message.value.content.sequenceNr;
             
-            // In the future, messages that are too big for one write will be written across several
-            const part = 1;
+            const part = message.value.content.part || 1;
 
             return [[author, persistenceId, sequenceNr, part]];
         } else {
@@ -36,7 +37,62 @@ module.exports = (sbot, myKey) => {
             lte: [authorId, persistenceId, toSequenceNumber, undefined]
         });
 
-        return pull(source, pull.map(msg => msg.value.value.content));
+        return pull(source, pull.map(msg => {
+            return msg.value.value.content
+        }), reAssemblePartsThrough());
+    }
+
+    function reAssemblePartsThrough() {
+
+        var windowing = false;
+
+        var parts = [];
+
+        return window(function(_, cb) {
+
+            if (windowing) return;
+            windowing = true;
+
+            return function (end, data) {
+                
+                if (!data.part) { 
+                    cb(null, data);
+                    windowing = false;
+                }
+                else if (end && parts.length > 0) return cb(null, assembleParts(parts));
+                else if (end) return cb(null, data);
+                else if (data.part === data.of) {
+                    windowing = false;
+                    parts.push(data);
+                    cb(null, assembleParts(parts))
+                }
+                else {
+                    parts.push(data);
+                }
+            }
+        }, function( start, data) {
+            return data;
+        });
+    }
+
+    function assembleParts(parts) {
+
+        const payloads = parts.map(part => part.payload);
+
+        const fullPayload = payloads.join('');
+
+        const full = parts[0];
+        
+        if (full.encrypted) {
+            // Encrypted payloads are base64 strings until they're decrypted later in the
+            // pipeline
+            full.payload = fullPayload;
+        } else {
+            // Make it into an object again now that the string is joined up.
+            full.payload = JSON.parse(fullPayload);
+        }
+        
+        return full;
     }
 
     function highestSequenceNumber(authorId, persistenceId, cb) {
@@ -44,6 +100,7 @@ module.exports = (sbot, myKey) => {
         const source = eventsByPersistenceId(authorId, persistenceId, 0, undefined);
 
         pull(source, pull.collect( (err, result) => {
+        
             if (err) {
                 cb(err);
             } else if (result.length === 0) {

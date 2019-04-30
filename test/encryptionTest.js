@@ -69,9 +69,6 @@ describe("Test encryption and decryption functionality", function () {
 
                     });
 
-    
-
-    
                 }
             });
 
@@ -108,7 +105,6 @@ describe("Test encryption and decryption functionality", function () {
             const stream = sbot.akkaPersistenceIndex.eventsByPersistenceId('@' + pietKeys.public, 'sample-id-6', 1, 100);
 
             pull(stream, pull.collect((err, result) => {
-                console.log(result);
 
                 assert.equal(result.length, 4, "there should be 4 events.");
 

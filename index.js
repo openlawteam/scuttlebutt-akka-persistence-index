@@ -36,7 +36,7 @@ exports.init = (ssb, config) => {
     const accessIndex = AccessIndex(ssb, config);
     const entityEventsIndex = EntityEventsIndex(ssb, '@' + config.keys.public);
 
-    const publishPublic = promisify(ssb.publish);
+    const publish = promisify(ssb.publish);
 
     const randomBytes = promisify(crypto.randomBytes);
 
@@ -230,6 +230,51 @@ exports.init = (ssb, config) => {
 
     function validateMessage(persistedMessage, cb) {
         return true;
+    }
+
+    function publishPublic(message) {
+
+        const payloadIsString = typeof(message.payload) === 'string';
+
+        const stringRepresentation = payloadIsString ? message.payload : JSON.stringify(message.payload);
+
+        const bytes = Buffer.byteLength(stringRepresentation, 'utf8');
+
+        // The maximum size of one full scuttlebutt message is 8192 bytes, so we need to split large payloads
+        // over multiple parts
+        if (bytes >= 7200) {
+
+            const buffer = Buffer.from(stringRepresentation, 'utf8');
+            const parts = chunks(buffer, 7200);
+
+            const messages = parts.map((part, partNumber) => {
+                const cloned = Object.assign({}, message);
+
+                cloned.part = partNumber + 1;
+                cloned.of = parts.length;
+                cloned.payload = part.toString('utf8');
+
+                return cloned;
+            });
+
+            return Promise.all(messages.map(msg => publish(msg)));
+        } else {
+            return publish(message);
+        }
+    }
+
+
+    function chunks (buffer, chunkSize) {
+    
+        var result = [];
+        var len = buffer.length;
+        var i = 0;
+    
+        while (i < len) {
+            result.push(buffer.slice(i, i += chunkSize));
+        }
+    
+        return result;
     }
 
     function publishWithKey(persistedMessage) {
