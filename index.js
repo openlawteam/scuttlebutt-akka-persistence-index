@@ -245,7 +245,7 @@ exports.init = (ssb, config) => {
         if (bytes >= 7200) {
 
             const buffer = Buffer.from(stringRepresentation, 'utf8');
-            const parts = chunks(buffer, 7200);
+            const parts = breakIntoParts(buffer, 7200);
 
             const messages = parts.map((part, partNumber) => {
                 const cloned = Object.assign({}, message);
@@ -264,17 +264,17 @@ exports.init = (ssb, config) => {
     }
 
 
-    function chunks (buffer, chunkSize) {
+    function breakIntoParts(buffer, chunkSize) {
     
-        var result = [];
-        var len = buffer.length;
-        var i = 0;
+        const parts = [];
+        const length = buffer.length;
+        let i = 0;
     
-        while (i < len) {
-            result.push(buffer.slice(i, i += chunkSize));
+        while (i < length) {
+            parts.push(buffer.slice(i, i += chunkSize));
         }
     
-        return result;
+        return parts;
     }
 
     function publishWithKey(persistedMessage) {

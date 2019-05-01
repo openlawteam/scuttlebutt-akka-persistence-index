@@ -44,9 +44,9 @@ module.exports = (sbot, myKey) => {
 
     function reAssemblePartsThrough() {
 
-        var windowing = false;
+        let windowing = false;
 
-        var parts = [];
+        let parts = [];
 
         return window(function(_, cb) {
 
