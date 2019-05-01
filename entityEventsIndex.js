@@ -46,12 +46,12 @@ module.exports = (sbot, myKey) => {
 
         let windowing = false;
 
-        let parts = [];
-
         return window(function(_, cb) {
 
             if (windowing) return;
             windowing = true;
+
+            let parts = [];
 
             return function (end, data) {
                 

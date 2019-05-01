@@ -14,6 +14,7 @@ const pull = require('pull-stream');
 const pietPubWithPrefix = '@' + pietKeys.public;
 
 const bluebird = require('bluebird');
+const promisify = bluebird.promisify;
 
 const crypto = require('crypto');
 
@@ -93,34 +94,76 @@ describe("Entity events index", function() {
                         assert.equal(data, payload.data, "Should be re-assembled properly");
 
                         pull(sbot.messagesByType({type: 'akka-persistence-message'}), pull.collect((err, result2) => {
-                            console.log(result2);
 
-                            assert.equal(result2.length, 7, "Should be more than one message in the database.");
+                            assert.equal(result2.length, 7, "Should be more than one message in the actual database.");
 
                             sbot.close()
 
                         }))
 
                     }
+                }))
+            }
+        });
+    })
 
+    describe('A message in some parts followed by a whole message followed by parts results in 3 messages', function () {
+        const sbot = createSbot("test6", pietKeys);
+        
+        const randomData = crypto.randomBytes(22000).toString('hex');
+        const randomData2 = crypto.randomBytes(22000).toString('hex');
 
+        const longPayload = {
+            'data': randomData
+        }
+
+        const longPayload2 = {
+            'data': randomData2
+        }
+
+        const shortPayload = {
+            'data': 'hola'
+        };
+
+        const longTestMessage = makeTestMessage(longPayload,1, 'test-id');
+        const shortTestMessage = makeTestMessage(shortPayload, 2, 'test-id');
+        const longTestMessage2 = makeTestMessage(longPayload2, 3, 'test-id');
+
+        const persistEvent = promisify(sbot.akkaPersistenceIndex.persistEvent);
+
+        Promise.all([persistEvent(longTestMessage), persistEvent(shortTestMessage), persistEvent(longTestMessage2)]).then(
+            () => {
+
+                const source = sbot.akkaPersistenceIndex.eventsByPersistenceId(pietPubWithPrefix, "test-id", 0, 10);
+
+                pull(source, pull.collect((err, result) => {
+                    if (err) {
+                        assert.fail(err);
+                    } else {
+                        assert.equal(result.length, 3, "There should be 3 results");
+                        assert.equal(result[0].payload.data, randomData, "The first long payload should be as expected.");
+
+                        assert.equal(result[1].payload.data, "hola", "The second result should be the small message.");
+                        assert.equal(result[2].payload.data, randomData2, "The second long payload should be as expected.");
+                    }
+
+                    sbot.close();
 
                 }))
 
 
             }
+        ).catch((err) => {
 
-        });
-
+            sbot.close();
+            assert.fail(err);
+        })
 
 
     })
 
+
 });
-
-
-
-
 
 function postTestMessages(sbot) {
 
