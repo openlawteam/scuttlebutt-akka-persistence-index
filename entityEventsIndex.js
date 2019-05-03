@@ -55,12 +55,23 @@ module.exports = (sbot, myKey) => {
 
             return function (end, data) {
                 
-                if (!data.part) { 
+                if (end && parts.length > 0) { 
+                    const lastPart = parts[parts.length - 1];
+
+                    // If we haven't replicated the rest of the parts for the message,
+                    // we act as though we haven't got any of it as we can't do anything
+                    // with just part of
+                    if (lastPart.part === lastPart.of) {
+                        return cb(null, assembleParts(parts));
+                    } else {
+                        return cb(true, null);
+                    }
+                }
+                else if (end) return cb(null, data);
+                else if (!data.part) { 
                     cb(null, data);
                     windowing = false;
                 }
-                else if (end && parts.length > 0) return cb(null, assembleParts(parts));
-                else if (end) return cb(null, data);
                 else if (data.part === data.of) {
                     windowing = false;
                     parts.push(data);

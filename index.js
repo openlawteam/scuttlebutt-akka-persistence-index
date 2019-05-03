@@ -72,7 +72,12 @@ exports.init = (ssb, config) => {
 
     function decrypt(keyList, message) {
 
-        if (!message.encrypted) {
+        if (!message) {
+            // This can happen if we have a message part, but we haven't yet replicated
+            // the other parts.
+            return null;
+        }
+        else if (!message.encrypted) {
             return message;
         } else {
             const sequenceNr = message.sequenceNr;

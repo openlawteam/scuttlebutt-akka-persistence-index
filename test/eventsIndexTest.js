@@ -41,7 +41,7 @@ describe("Entity events index", function() {
 
         postTestMessages(sbot).then(
             () => {
-                const test = sbot.akkaPersistenceIndex.eventsByPersistenceId(pietPubWithPrefix, "sample-id-6", 0, 10);
+                const test = sbot.akkaPersistenceIndex.eventsByPersistenceId(pietPubWithPrefix, "sample-id-6", 0, 30);
                 pull(test, pull.collect((err, result) => {
 
                     //console.log(result);
@@ -50,7 +50,7 @@ describe("Entity events index", function() {
                         assert.fail(err);
                     } else {
                        // console.log(result);
-                        assert(10, result.length, 10);
+                        assert(100, result.length, 100);
                     }
 
                     sbot.close()
@@ -161,6 +161,64 @@ describe("Entity events index", function() {
 
 
     })
+
+    describe('If there are only some parts for a message replicated so far, we don\'t return any of them', function() {
+        const sbot = createSbot("test7", pietKeys);
+
+        const postMessage = bluebird.promisify(sbot.publish);
+
+        postMessage(
+            {
+                "payload": {
+                    "data": "new-test-" + 1
+                  },
+                  "sequenceNr": 1,
+                  "persistenceId": "sample-id-7",
+                  "manifest": "org.openlaw.scuttlebutt.persistence.Evt",
+                  "deleted": false,
+                  "sender": null,
+                  "writerUuid": "b73a85f3-8ca5-49ad-8405-9b5d886703e2",
+                  "type": "akka-persistence-message"
+                }
+        ).then(() => {
+            return [1,2,3].map((number) => {
+
+                const payload = {
+                    "payload": {
+                        "data": "new-test-" + number
+                      },
+                      "sequenceNr": 2,
+                      "part": number,
+                      "of": 7,
+                      "persistenceId": "sample-id-7",
+                      "manifest": "org.openlaw.scuttlebutt.persistence.Evt",
+                      "deleted": false,
+                      "sender": null,
+                      "writerUuid": "b73a85f3-8ca5-49ad-8405-9b5d886703e2",
+                      "type": "akka-persistence-message"
+                    }
+    
+                    return postMessage(payload);
+            });
+        })
+        .then(results => Promise.all(results))
+        .then(() => {
+            const source = sbot.akkaPersistenceIndex.eventsByPersistenceId(pietPubWithPrefix, "sample-id-7", 0, 10);
+
+            pull(source, pull.collect((err, result) => {
+
+                if (err) {
+                    console.log(err);
+                    assert.fail(err);
+                } else {
+                    assert.equal(result.length, 1, "There should only be one result");
+                }
+
+                sbot.close();
+            }))
+        })
+
+    });
 
 
 });
