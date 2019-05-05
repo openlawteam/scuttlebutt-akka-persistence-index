@@ -106,6 +106,34 @@ describe("Test persistence IDs indexing functionality", function () {
         });
     })
 
+    describe("Test all authors", function() {
+
+        const sbot = createSbot('test-4', pietKeys);
+
+        const postsMade = postTestDataSet(sbot);
+
+        postsMade.then(() => {
+
+            const source = sbot.akkaPersistenceIndex.persistenceIds.allAuthors();
+
+            pull(source, pull.collect((err, result) => {
+                if (err) {
+                    assert.fail(err);
+                } else {
+                    assert(result.length, 1, "There should only be one result");
+                }
+
+                sbot.close();
+
+            }));
+
+
+        });
+
+
+
+    });
+
 })
 
 function postTestDataSet(sbot) {

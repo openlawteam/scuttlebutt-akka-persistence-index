@@ -45,12 +45,9 @@ describe("Entity events index", function() {
                 const test = sbot.akkaPersistenceIndex.events.eventsByPersistenceId(pietPubWithPrefix, "sample-id-6", 0, 30);
                 pull(test, pull.collect((err, result) => {
 
-                    //console.log(result);
-
                     if (err) {
                         assert.fail(err);
                     } else {
-                       // console.log(result);
                         assert(100, result.length, 100);
                     }
 

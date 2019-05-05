@@ -24,7 +24,7 @@ module.exports = (ssb, myKey) => {
             // We only index the first item, as otherwise we would get repeats for live streams since old values
             // would be overrwritten to point to the latest message.
             if (sequenceNr == 1) {
-                return [[author, persistenceId]];
+                return [[author, persistenceId], [persistenceId, author], [author]];
             }
             else {
                 return [];
@@ -64,14 +64,14 @@ module.exports = (ssb, myKey) => {
 
             return pull(
                 index.read({
-                    gte: [null, persistenceId],
-                    lte: [undefined, persistenceId],
+                    gte: [persistenceId, null],
+                    lte: [persistenceId, undefined],
                     live: opts.live
                 }), 
                 pull.map(item => {
                     const key = item.key;
-                    return key[0];
-                }), pull.unique())
+                    return key[1];
+                }))
         },
         persistenceIdsForAuthor: (authorId, opts) => {
             opts = opts || {};
@@ -92,13 +92,14 @@ module.exports = (ssb, myKey) => {
 
             return pull(
                 index.read({
-                    gte: [null, null],
-                    lte: [undefined, undefined],
+                    gte: [null],
+                    lte: [undefined],
                     live: opts.live,
                     keys: true
                 }), pull.map(item => {
                     return item.key[0];
-                }, pull.unique())
+                }),
+                pull.unique()
             );
 
         }
