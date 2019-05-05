@@ -18,6 +18,7 @@ const promisify = bluebird.promisify;
 
 const crypto = require('crypto');
 
+const makeTestMessage = require('./testUtils').makeTestMessage;
 
 function createSbot(testBotName, keys) {
 
@@ -41,7 +42,7 @@ describe("Entity events index", function() {
 
         postTestMessages(sbot).then(
             () => {
-                const test = sbot.akkaPersistenceIndex.eventsByPersistenceId(pietPubWithPrefix, "sample-id-6", 0, 30);
+                const test = sbot.akkaPersistenceIndex.events.eventsByPersistenceId(pietPubWithPrefix, "sample-id-6", 0, 30);
                 pull(test, pull.collect((err, result) => {
 
                     //console.log(result);
@@ -60,7 +61,7 @@ describe("Entity events index", function() {
         )
     })
 
-    describe("Splits test messages into parts, then reassembkes them", function() {
+    describe("Splits test messages into parts, then reassembles them", function() {
 
         const sbot = createSbot("test5", pietKeys);
         
@@ -72,14 +73,14 @@ describe("Entity events index", function() {
 
         const testMessage = makeTestMessage(payload,1, 'test-id');
 
-        sbot.akkaPersistenceIndex.persistEvent(testMessage, (err, result) => {
+        sbot.akkaPersistenceIndex.events.persistEvent(testMessage, (err, result) => {
 
             if (err) {
                 console.log(err);
                 assert.fail(err);
             } else {
 
-                const source = sbot.akkaPersistenceIndex.eventsByPersistenceId(pietPubWithPrefix, "test-id", 0, 10);
+                const source = sbot.akkaPersistenceIndex.events.eventsByPersistenceId(pietPubWithPrefix, "test-id", 0, 10);
 
                 pull(source, pull.collect((err, result) => {
 
@@ -129,12 +130,12 @@ describe("Entity events index", function() {
         const shortTestMessage = makeTestMessage(shortPayload, 2, 'test-id');
         const longTestMessage2 = makeTestMessage(longPayload2, 3, 'test-id');
 
-        const persistEvent = promisify(sbot.akkaPersistenceIndex.persistEvent);
+        const persistEvent = promisify(sbot.akkaPersistenceIndex.events.persistEvent);
 
         Promise.all([persistEvent(longTestMessage), persistEvent(shortTestMessage), persistEvent(longTestMessage2)]).then(
             () => {
 
-                const source = sbot.akkaPersistenceIndex.eventsByPersistenceId(pietPubWithPrefix, "test-id", 0, 10);
+                const source = sbot.akkaPersistenceIndex.events.eventsByPersistenceId(pietPubWithPrefix, "test-id", 0, 10);
 
                 pull(source, pull.collect((err, result) => {
                     if (err) {
@@ -150,7 +151,6 @@ describe("Entity events index", function() {
                     sbot.close();
 
                 }))
-
 
             }
         ).catch((err) => {
@@ -203,7 +203,7 @@ describe("Entity events index", function() {
         })
         .then(results => Promise.all(results))
         .then(() => {
-            const source = sbot.akkaPersistenceIndex.eventsByPersistenceId(pietPubWithPrefix, "sample-id-7", 0, 10);
+            const source = sbot.akkaPersistenceIndex.events.eventsByPersistenceId(pietPubWithPrefix, "sample-id-7", 0, 10);
 
             pull(source, pull.collect((err, result) => {
 
@@ -247,19 +247,5 @@ function postTestMessages(sbot) {
     }
 
     return Promise.all(results);
-}
-
-function makeTestMessage(data, sequenceNr, persistId) {
-    return {
-        "payload": data,
-          "sequenceNr": sequenceNr,
-          "persistenceId": persistId,
-          "manifest": "org.openlaw.scuttlebutt.persistence.Evt",
-          "deleted": false,
-          "sender": null,
-          "writerUuid": "b73a85f3-8ca5-49ad-8405-9b5d886703e2",
-          "type": "akka-persistence-message"
-        };
-
 }
 

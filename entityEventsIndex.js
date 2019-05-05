@@ -3,6 +3,8 @@ const pull = require('pull-stream');
 
 const window = require('pull-window');
 
+const isPersistenceMessage = require('./util').isPersistenceMessage;
+
 module.exports = (sbot, myKey) => {
 
     const version = 2;
@@ -23,11 +25,6 @@ module.exports = (sbot, myKey) => {
         } else {
             return [];
         }
-    }
-
-    function isPersistenceMessage(message) {
-        const type = message.value.content.type;
-        return type === "akka-persistence-message";
     }
 
     function eventsByPersistenceId(authorId, persistenceId, fromSequenceNumber, toSequenceNumber) {

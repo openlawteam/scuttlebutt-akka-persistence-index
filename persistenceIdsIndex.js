@@ -1,46 +1,106 @@
-const FlumeReduce = require('flumeview-reduce');
+const FlumeviewLevel = require('flumeview-level');
 const pull = require('pull-stream');
+
+const isPersistenceMessage = require('./util').isPersistenceMessage;
 
 module.exports = (ssb, myKey) => {
 
-    const indexVersion = 1;
+    const indexVersion = 2;
 
-    const view = ssb._flumeUse('akka-persistence-index',
-        FlumeReduce(
+    const index = ssb._flumeUse('akka-persistence-index',
+        FlumeviewLevel(
             indexVersion,
-            flumeReduceFunction,
             flumeMapFunction)
     )
 
-    function flumeReduceFunction(index, persistenceId) {
+    function flumeMapFunction(msg) {
 
-        if (!index) index = []
+        if (isPersistenceMessage(msg)) {
+            const author = msg.value.author;
+            const persistenceId = msg.value.content.persistenceId;
 
-        if (!index.includes(persistenceId)) {
-            index.push(persistenceId)
+            const sequenceNr = msg.value.content.sequenceNr;
+
+            // We only index the first item, as otherwise we would get repeats for live streams since old values
+            // would be overrwritten to point to the latest message.
+            if (sequenceNr == 1) {
+                return [[author, persistenceId]];
+            }
+            else {
+                return [];
+            }
+
+            
+        } else {
+            return [];
         }
 
-        return index;
+        
     }
 
-    function flumeMapFunction(item) {
-        // If this is a akka persistence type message, we return it - if there isn't, the reducer isn't ran for 'undefined'
-        // values
+    function persistenceIdsQuery(author, live) {
 
-        if (item.value.author === myKey) {
-            return item.value.content['persistenceId'];
-        }
+        return pull(index.read({
+            gte: [author, null],
+            lte: [author, undefined],
+            live
+        }), pull.map(value => {
+            return value.value.value.content.persistenceId;
+        }));
     }
 
     return {
-        currentPersistenceIds: () => {
-            return pull(view.stream({live: false}), pull.flatten())
+        myCurrentPersistenceIds: () => {
+            return persistenceIdsQuery(myKey, false);
         },
-        currentPersistenceIdsAsync: (cb) => {
-            view.get(cb)
+        myCurrentPersistenceIdsAsync: (cb) => {
+            pull(persistenceIdsQuery(myKey, false), pull.collect(cb));
         },
-        livePersistenceIds: () => {
-            return pull(view.stream({live: true}), pull.flatten(), pull.unique(), pull.filter(item => !item.sync))
+        myLivePersistenceIds: () => {
+            return pull(persistenceIdsQuery(myKey, true))
+        },
+        authorsForPersistenceId: (persistenceId, opts) => {
+            opts = opts || {};
+
+            return pull(
+                index.read({
+                    gte: [null, persistenceId],
+                    lte: [undefined, persistenceId],
+                    live: opts.live
+                }), 
+                pull.map(item => {
+                    const key = item.key;
+                    return key[0];
+                }), pull.unique())
+        },
+        persistenceIdsForAuthor: (authorId, opts) => {
+            opts = opts || {};
+
+            return pull(
+                index.read({
+                    gte: [authorId, null],
+                    lte: [authorId, undefined],
+                    live: opts.live
+                }), pull.map( item => {
+                    const persistenceId = item.key[1];
+                    return persistenceId;
+                })
+            );
+        },
+        allAuthors: (opts) => {
+            opts = opts || {};
+
+            return pull(
+                index.read({
+                    gte: [null, null],
+                    lte: [undefined, undefined],
+                    live: opts.live,
+                    keys: true
+                }), pull.map(item => {
+                    return item.key[0];
+                }, pull.unique())
+            );
+
         }
     }
 }
