@@ -108,6 +108,7 @@ module.exports = (ssb, myKey, keysIndex) => {
                     gte: [persistenceId, null, null],
                     lte: [persistenceId, undefined, undefined],
                     live: opts.live,
+                    reverse: opts.reverse,
                     keys: true
                 }),
                 pull.asyncMap((result, cb) => {
@@ -150,6 +151,7 @@ module.exports = (ssb, myKey, keysIndex) => {
                 }
         },
         persistenceIdsForAuthor: (authorId, opts) => {
+            authorId = authorId || myKey;
             opts = opts || {};
 
             const source = pull(
