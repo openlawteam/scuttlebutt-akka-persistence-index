@@ -1,5 +1,6 @@
 const FlumeviewLevel = require('flumeview-level');
 const pull = require('pull-stream');
+const zip  = require('pull-zip')
 
 const isPersistenceMessage = require('./util').isPersistenceMessage;
 
@@ -51,20 +52,57 @@ module.exports = (ssb, myKey, keysIndex) => {
         }));
     }
 
+    function takeRange(stream, start, end) {
+        start = start || 0;
+
+        let i = -1;
+        const infiniteStream = pull.infinite(() => {
+            i = i + 1;
+            return i;
+        });
+
+        return pull(
+            zip([infiniteStream, stream]),
+            pull.filter(item => item[0] >= start),
+            pull.take(result => {
+                const current = result[0];
+                
+                const item = result[1];
+                return item && (current < end || !end);
+            })
+        );
+    }
+
     return {
-        myCurrentPersistenceIds: () => {
-            return persistenceIdsQuery(myKey, false);
+        myCurrentPersistenceIds: (opts) => {
+            opts = opts || {};
+
+            const stream = persistenceIdsQuery(myKey, false);
+
+            if (opts.start >= 0) {
+                return takeRange(stream, opts.start, opts.end);
+            } else {
+                return stream;
+            }
+
         },
         myCurrentPersistenceIdsAsync: (cb) => {
             pull(persistenceIdsQuery(myKey, false), pull.collect(cb));
         },
-        myLivePersistenceIds: () => {
-            return pull(persistenceIdsQuery(myKey, true))
+        myLivePersistenceIds: (opts) => {
+            opts = opts || {};
+
+            const source = persistenceIdsQuery(myKey, true);
+            if (opts.start >= 0) {
+                return takeRange(source, opts.start, opts.end);
+            } else {
+                return source;
+            }
         },
         authorsForPersistenceId: (persistenceId, opts) => {
             opts = opts || {};
 
-            return pull(
+            const source = pull(
                 index.read({
                     gte: [persistenceId, null, null],
                     lte: [persistenceId, undefined, undefined],
@@ -103,11 +141,17 @@ module.exports = (ssb, myKey, keysIndex) => {
                 pull.map(result => {
                     return result.data[2];
                 }))
+
+                if (opts.start >= 0) {
+                    return takeRange(source, opts.start, opts.end);
+                } else {
+                    return source;
+                }
         },
         persistenceIdsForAuthor: (authorId, opts) => {
             opts = opts || {};
 
-            return pull(
+            const source = pull(
                 index.read({
                     gte: [authorId, null, null],
                     lte: [authorId, undefined, undefined],
@@ -149,11 +193,18 @@ module.exports = (ssb, myKey, keysIndex) => {
                     return persistenceId;
                 })
             );
+
+            if (opts.start >= 0) {
+                return takeRange(source, opts.start, opts.end);
+            } else {
+                return source;
+            }
+
         },
         allAuthors: (opts) => {
             opts = opts || {};
 
-            return pull(
+            const source = pull(
                 index.read({
                     gte: [null],
                     lte: [undefined],
@@ -164,6 +215,12 @@ module.exports = (ssb, myKey, keysIndex) => {
                 }),
                 pull.unique()
             );
+
+            if (opts.start >= 0) {
+                return takeRange(source, opts.start, opts.end);
+            } else {
+                return source;
+            }
 
         }
     }

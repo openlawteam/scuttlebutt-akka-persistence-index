@@ -311,7 +311,6 @@ describe("Test persistence IDs indexing functionality", function () {
                 if (err) {
                     assert.fail(err);
                 } else {
-                    console.log(result);
                     assert.equal(result.length, 1, "There should only be 1 result.");
                 }
 
@@ -319,6 +318,117 @@ describe("Test persistence IDs indexing functionality", function () {
             }));
 
         });
+    });
+
+    describe("Test pagination for persistence IDs for author", function() {
+
+        const sbot = createSbot('test-9', pietKeys);
+        const persistMessage = promisify(sbot.akkaPersistenceIndex.events.persistEvent);
+
+        const results = [];
+
+        for (var i = 0; i < 100; i++) {
+            const messageEvent = {
+                "payload": {
+
+                },
+                "sequenceNr": 1,
+                "persistenceId": "sample-id-" + i,
+                "manifest": "random.manifest",
+                "deleted": false,
+                "sender": null,
+                "writerUuid": "b73a85f3-8ca5-49ad-8405-9b5d886703e2",
+                "type": "akka-persistence-message"
+            };
+
+            const result  = persistMessage(messageEvent);
+            results.push(result);
+        }
+
+        Promise.all(results).then(() => {
+
+            const source = sbot.akkaPersistenceIndex.persistenceIds.persistenceIdsForAuthor(
+                '@' + pietKeys.public,
+                {
+                    start: 0,
+                    end: 20
+                }
+            )
+
+            pull(source, pull.collect((err, result) => {
+                assert.equal(result.length, 20, "There should be 20 results");
+            }))
+
+            const source2 = sbot.akkaPersistenceIndex.persistenceIds.persistenceIdsForAuthor(
+                '@' + pietKeys.public,
+                {
+                    start: 99,
+                    end: 120
+                }
+            );
+
+            pull(source2, pull.collect((err,results) => {
+                assert.equal(results.length, 1, "There should be one result");
+
+                sbot.close();
+            }));
+
+        });
+
+    });
+
+    describe("Test pagination for own persistence IDs", function() {
+        const sbot = createSbot('test-10', pietKeys);
+        const persistMessage = promisify(sbot.akkaPersistenceIndex.events.persistEvent);
+
+        const results = [];
+
+        for (var i = 0; i < 100; i++) {
+            const messageEvent = {
+                "payload": {
+
+                },
+                "sequenceNr": 1,
+                "persistenceId": "sample-id-" + i,
+                "manifest": "random.manifest",
+                "deleted": false,
+                "sender": null,
+                "writerUuid": "b73a85f3-8ca5-49ad-8405-9b5d886703e2",
+                "type": "akka-persistence-message"
+            };
+
+            const result  = persistMessage(messageEvent);
+            results.push(result);
+        }
+
+        Promise.all(results).then(() => {
+
+            const source = sbot.akkaPersistenceIndex.persistenceIds.myCurrentPersistenceIds(
+                {
+                    start: 0,
+                    end: 20
+                }
+            )
+
+            pull(source, pull.collect((err, result) => {
+                assert.equal(result.length, 20, "There should be 20 results");
+            }))
+
+            const source2 = sbot.akkaPersistenceIndex.persistenceIds.myCurrentPersistenceIds(
+                {
+                    start: 99,
+                    end: 120
+                }
+            );
+
+            pull(source2, pull.collect((err,results) => {
+                assert.equal(results.length, 1, "There should be one result");
+
+                sbot.close();
+            }));
+
+        });
+
     });
 
 })
