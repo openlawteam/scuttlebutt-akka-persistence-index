@@ -34,10 +34,9 @@ exports.init = (ssb, config) => {
 
     const encryptionAlgorithm = 'aes-256-ctr';
 
-    const persistenceIdsIndex = PersistenceIdsIndex(ssb, '@' + config.keys.public);
-
     const accessIndex = AccessIndex(ssb, config);
     const entityEventsIndex = EntityEventsIndex(ssb, '@' + config.keys.public);
+    const persistenceIdsIndex = PersistenceIdsIndex(ssb, '@' + config.keys.public, accessIndex);
 
     const publish = promisify(ssb.publish);
 

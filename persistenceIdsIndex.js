@@ -3,7 +3,7 @@ const pull = require('pull-stream');
 
 const isPersistenceMessage = require('./util').isPersistenceMessage;
 
-module.exports = (ssb, myKey) => {
+module.exports = (ssb, myKey, keysIndex) => {
 
     const indexVersion = 2;
 
@@ -21,10 +21,12 @@ module.exports = (ssb, myKey) => {
 
             const sequenceNr = msg.value.content.sequenceNr;
 
+            const isEncrypted = msg.value.content.encrypted || false;
+
             // We only index the first item, as otherwise we would get repeats for live streams since old values
             // would be overrwritten to point to the latest message.
             if (sequenceNr == 1) {
-                return [[author, persistenceId], [persistenceId, author], [author]];
+                return [[author, isEncrypted, persistenceId], [persistenceId, isEncrypted, author], [author]];
             }
             else {
                 return [];
@@ -64,13 +66,42 @@ module.exports = (ssb, myKey) => {
 
             return pull(
                 index.read({
-                    gte: [persistenceId, null],
-                    lte: [persistenceId, undefined],
-                    live: opts.live
-                }), 
-                pull.map(item => {
-                    const key = item.key;
-                    return key[1];
+                    gte: [persistenceId, null, null],
+                    lte: [persistenceId, undefined, undefined],
+                    live: opts.live,
+                    keys: true
+                }),
+                pull.asyncMap((result, cb) => {
+                    const data = result.key;
+
+                    const persistenceId = data[0];
+                    const isEncrypted = data[1];
+                    const author = data[2];
+
+                    if (!isEncrypted) {
+                        cb(null, {
+                            data: data,
+                            isEncrypted: false,
+                            keys: []
+                        });
+                    } else {
+                        // Get our keys for the entity for the given author (if any.)
+                        keysIndex.getAllKeysFor(persistenceId, author).then(
+                            keys => {
+                                return {
+                                    data: data,
+                                    isEncrypted: true,
+                                    keys: keys
+                                }
+                            }
+                        ).asCallback(cb);
+                    }
+
+                }),
+                // Filter out any persistenceIds that are private and we don't have the keys for.
+                pull.filter(item => item.isEncrypted === false || item.keys.length > 0),
+                pull.map(result => {
+                    return result.data[2];
                 }))
         },
         persistenceIdsForAuthor: (authorId, opts) => {
@@ -78,11 +109,39 @@ module.exports = (ssb, myKey) => {
 
             return pull(
                 index.read({
-                    gte: [authorId, null],
-                    lte: [authorId, undefined],
-                    live: opts.live
-                }), pull.map( item => {
-                    const persistenceId = item.key[1];
+                    gte: [authorId, null, null],
+                    lte: [authorId, undefined, undefined],
+                    live: opts.live,
+                    keys: true
+                }),
+                pull.asyncMap((data, cb) => {
+                    const isEncrypted = data.key[1];
+
+                    if (!isEncrypted) {
+                        cb(null, {
+                            data: data.key,
+                            isEncrypted: false,
+                            keys: []
+                        })
+                    } else {
+                        const persistenceId = data.key[2];
+                        const authorId = data.key[0];
+
+                        keysIndex.getAllKeysFor(persistenceId, authorId).then(
+                            keys => {
+                                return {
+                                    data: data.key,
+                                    isEncrypted: true,
+                                    keys: keys
+                                }
+                            }
+
+                        ).asCallback(cb);
+                    }
+                }),
+                pull.filter(item => !item.isEncrypted || item.keys !== []),
+                pull.map( item => {
+                    const persistenceId = item.data[2];
                     return persistenceId;
                 })
             );
