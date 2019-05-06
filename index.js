@@ -15,9 +15,12 @@ exports.version = require('./package.json').version
 
 exports.manifest = {
     persistenceIds: {
-        currentPersistenceIds: 'source',
-        currentPersistenceIdsAsync: 'async',
-        livePersistenceIds: 'source',
+        myCurrentPersistenceIds: 'source',
+        myCurrentPersistenceIdsAsync: 'async',
+        myLivePersistenceIds: 'source',
+        authorsForPersistenceId: 'source',
+        persistenceIdsForAuthor: 'source',
+        allAuthors: 'source',
     },
     events: {
         eventsByPersistenceId: 'source',
