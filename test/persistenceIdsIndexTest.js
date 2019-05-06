@@ -150,7 +150,19 @@ describe("Test persistence IDs indexing functionality", function () {
             "type": "akka-persistence-message"
         }
 
-        persistMessage(setKeysEvent).then(result => {
+        const setKeysEvent2 = {
+            "payload": {
+            },
+            "sequenceNr": 1,
+            "persistenceId": "sample-id-7",
+            "manifest": constants.setKeyType,
+            "deleted": false,
+            "sender": null,
+            "writerUuid": "b73a85f3-8ca5-49ad-8405-9b5d886703e2",
+            "type": "akka-persistence-message"
+        }
+
+        Promise.all([persistMessage(setKeysEvent), persistMessage(setKeysEvent2)]).then(result => {
 
             const source = sbot.akkaPersistenceIndex.persistenceIds.authorsForPersistenceId('sample-id-6');
 
@@ -210,18 +222,103 @@ describe("Test persistence IDs indexing functionality", function () {
                 sbot.close();
             }));
 
-        })
-
-
+        });
 
     });
 
     describe("Test persistenceIdsForAuthor when we have the encryption key for a private entity", function () {
+        const sbot = createSbot('test-7', pietKeys);
+        const persistMessage = promisify(sbot.akkaPersistenceIndex.events.persistEvent);
+
+        const setKeysEvent = {
+            "payload": {
+            },
+            "sequenceNr": 1,
+            "persistenceId": "sample-id-6",
+            "manifest": constants.setKeyType,
+            "deleted": false,
+            "sender": null,
+            "writerUuid": "b73a85f3-8ca5-49ad-8405-9b5d886703e2",
+            "type": "akka-persistence-message"
+        };
+
+        const setKeysEvent2 = {
+            "payload": {
+            },
+            "sequenceNr": 1,
+            "persistenceId": "sample-id-7",
+            "manifest": constants.setKeyType,
+            "deleted": false,
+            "sender": null,
+            "writerUuid": "b73a85f3-8ca5-49ad-8405-9b5d886703e2",
+            "type": "akka-persistence-message"
+        };
+
+        Promise.all([persistMessage(setKeysEvent), persistMessage(setKeysEvent2)]).then(() => {
+
+            const source = sbot.akkaPersistenceIndex.persistenceIds.persistenceIdsForAuthor('@' + pietKeys.public);
+
+            pull(source, pull.collect((err, result) => {
+                if (err) {
+                    assert.fail(err);
+                } else {
+                    assert.equal(result.length, 2, "There should be 2 results.");
+                }
+
+                sbot.close();
+            }));
+
+        });
 
     });
 
     describe("Test persistenceIdsForAuthor when entity is private, but we don't have the keys", function () {
+        
+        const sbot = createSbot('test-8', pietKeys);
+        const persistMessage = promisify(sbot.akkaPersistenceIndex.events.persistEvent);
 
+        // Encrypted, and we don't have a key for it
+        const messageEvent = {
+            "payload": "random encrypted text",
+            "sequenceNr": 1,
+            "persistenceId": "sample-id-9",
+            "manifest": "random.manifest",
+            "encrypted": true,
+            "deleted": false,
+            "sender": null,
+            "writerUuid": "b73a85f3-8ca5-49ad-8405-9b5d886703e2",
+            "type": "akka-persistence-message"
+        };
+
+        // Encrypted, and we will give ourselves the key for it automatically.
+        const setKeysEvent2 = {
+            "payload": {
+            },
+            "sequenceNr": 1,
+            "persistenceId": "sample-id-10",
+            "manifest": constants.setKeyType,
+            "deleted": false,
+            "sender": null,
+            "writerUuid": "b73a85f3-8ca5-49ad-8405-9b5d886703e2",
+            "type": "akka-persistence-message"
+        };
+
+        Promise.all([persistMessage(messageEvent), persistMessage(setKeysEvent2)]).then(() => {
+
+            const source = sbot.akkaPersistenceIndex.persistenceIds.persistenceIdsForAuthor('@' + pietKeys.public);
+
+            pull(source, pull.collect((err, result) => {
+                if (err) {
+                    assert.fail(err);
+                } else {
+                    console.log(result);
+                    assert.equal(result.length, 1, "There should only be 1 result.");
+                }
+
+                sbot.close();
+            }));
+
+        });
     });
 
 })

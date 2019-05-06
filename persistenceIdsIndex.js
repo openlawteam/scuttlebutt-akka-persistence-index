@@ -115,9 +115,10 @@ module.exports = (ssb, myKey, keysIndex) => {
                     keys: true
                 }),
                 pull.asyncMap((data, cb) => {
-                    const isEncrypted = data.key[1];
+                    const isEncrypted = data.key[1] || false;
 
                     if (!isEncrypted) {
+                        
                         cb(null, {
                             data: data.key,
                             isEncrypted: false,
@@ -129,6 +130,7 @@ module.exports = (ssb, myKey, keysIndex) => {
 
                         keysIndex.getAllKeysFor(persistenceId, authorId).then(
                             keys => {
+
                                 return {
                                     data: data.key,
                                     isEncrypted: true,
@@ -139,7 +141,9 @@ module.exports = (ssb, myKey, keysIndex) => {
                         ).asCallback(cb);
                     }
                 }),
-                pull.filter(item => !item.isEncrypted || item.keys !== []),
+                pull.filter(item => {
+                    return !item.isEncrypted || (item.keys.length > 0)
+                }),
                 pull.map( item => {
                     const persistenceId = item.data[2];
                     return persistenceId;
