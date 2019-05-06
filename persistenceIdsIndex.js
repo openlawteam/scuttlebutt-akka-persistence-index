@@ -69,7 +69,8 @@ module.exports = (ssb, myKey, keysIndex) => {
                 
                 const item = result[1];
                 return item && (current < end || !end);
-            })
+            }),
+            pull.map(result => result[1])
         );
     }
 

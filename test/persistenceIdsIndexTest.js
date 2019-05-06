@@ -411,6 +411,8 @@ describe("Test persistence IDs indexing functionality", function () {
             )
 
             pull(source, pull.collect((err, result) => {
+                console.log(result[0]);
+                assert.equal(result[0], "sample-id-0", "Should start with th expected value.");
                 assert.equal(result.length, 20, "There should be 20 results");
             }))
 
