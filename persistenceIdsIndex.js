@@ -27,7 +27,7 @@ module.exports = (ssb, myKey, keysIndex) => {
             // We only index the first item, as otherwise we would get repeats for live streams since old values
             // would be overrwritten to point to the latest message.
             if (sequenceNr == 1) {
-                return [[author, isEncrypted, persistenceId], [persistenceId, isEncrypted, author], [author]];
+                return [[author, isEncrypted, persistenceId], [persistenceId, isEncrypted, author]];
             }
             else {
                 return [];
@@ -209,11 +209,15 @@ module.exports = (ssb, myKey, keysIndex) => {
 
             const source = pull(
                 index.read({
-                    gte: [null],
-                    lte: [undefined],
+                    gte: [null, null, null],
+                    lte: [undefined, undefined, undefined],
                     live: opts.live,
                     keys: true
-                }), pull.map(item => {
+                }),
+                pull.filter(item => {
+                    return item.key[0].startsWith('@');
+                }),
+                pull.map(item => {
                     return item.key[0];
                 }),
                 pull.unique()
