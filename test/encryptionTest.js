@@ -16,8 +16,6 @@ const promisify = require('bluebird').promisify;
 
 const Bluebird = require('bluebird');
 
-const IV_LENGTH = 16;
-
 function createSbot(testBotName, keys) {
 
     var makeSbot = CreateTestSbot.use(
@@ -44,15 +42,15 @@ describe("Test encryption and decryption functionality", function () {
             "key": "value"
         }, 2);    
 
-        sbot.akkaPersistenceIndex.persistEvent(setKeysEvent, (err, result) => {
-            sbot.akkaPersistenceIndex.persistEvent(nextEvent, (err2, res2) => {
+        sbot.akkaPersistenceIndex.events.persistEvent(setKeysEvent, (err, result) => {
+            sbot.akkaPersistenceIndex.events.persistEvent(nextEvent, (err2, res2) => {
                 if (err || err2) {
                     assert.fail(err);
                 } else {
     
-                    const stream = sbot.akkaPersistenceIndex.eventsByPersistenceId('@' + pietKeys.public, 'sample-id-6', 1, 100);
+                    const stream = sbot.akkaPersistenceIndex.events.eventsByPersistenceId('@' + pietKeys.public, 'sample-id-6', 1, 100);
 
-                    sbot.akkaPersistenceIndex.highestSequenceNumber(null, 'sample-id-6', (err, result) => {
+                    sbot.akkaPersistenceIndex.events.highestSequenceNumber(null, 'sample-id-6', (err, result) => {
 
                         if (err) {
                             assert.fail(err);
@@ -79,7 +77,7 @@ describe("Test encryption and decryption functionality", function () {
     describe("Continue to decrypt after key changes", function() {
 
         const sbot = createSbot("test10", pietKeys);
-        const postEvent = promisify(sbot.akkaPersistenceIndex.persistEvent);
+        const postEvent = promisify(sbot.akkaPersistenceIndex.events.persistEvent);
 
         const setKeysEvent = makeRandomSetKeyEvent(1);
 
@@ -102,7 +100,7 @@ describe("Test encryption and decryption functionality", function () {
 
         posted.then(() => {
 
-            const stream = sbot.akkaPersistenceIndex.eventsByPersistenceId('@' + pietKeys.public, 'sample-id-6', 1, 100);
+            const stream = sbot.akkaPersistenceIndex.events.eventsByPersistenceId('@' + pietKeys.public, 'sample-id-6', 1, 100);
 
             pull(stream, pull.collect((err, result) => {
 

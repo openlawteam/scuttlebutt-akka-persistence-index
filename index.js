@@ -14,13 +14,19 @@ exports.name = 'akka-persistence-index'
 exports.version = require('./package.json').version
 
 exports.manifest = {
-    currentPersistenceIds: 'source',
-    currentPersistenceIdsAsync: 'async',
-    livePersistenceIds: 'source',
-
-    eventsByPersistenceId: 'source',
-    highestSequenceNumber: 'async',
-    persistEvent: 'async'
+    persistenceIds: {
+        myCurrentPersistenceIds: 'source',
+        myCurrentPersistenceIdsAsync: 'async',
+        myLivePersistenceIds: 'source',
+        authorsForPersistenceId: 'source',
+        persistenceIdsForAuthor: 'source',
+        allAuthors: 'source',
+    },
+    events: {
+        eventsByPersistenceId: 'source',
+        highestSequenceNumber: 'async',
+        persistEvent: 'async'
+    }
 }
 
 const indexVersion = 1;
@@ -31,10 +37,9 @@ exports.init = (ssb, config) => {
 
     const encryptionAlgorithm = 'aes-256-ctr';
 
-    const persistenceIdsIndex = PersistenceIdsIndex(ssb, '@' + config.keys.public);
-
     const accessIndex = AccessIndex(ssb, config);
     const entityEventsIndex = EntityEventsIndex(ssb, '@' + config.keys.public);
+    const persistenceIdsIndex = PersistenceIdsIndex(ssb, '@' + config.keys.public, accessIndex);
 
     const publish = promisify(ssb.publish);
 
@@ -336,19 +341,12 @@ exports.init = (ssb, config) => {
     }
 
     return {
-        eventsByPersistenceId: eventsByPersistenceId,
-        highestSequenceNumber: highestSequenceNumber,
-        persistEvent: persistEvent,
-
-        currentPersistenceIds: () => {
-            return persistenceIdsIndex.currentPersistenceIds();
+        events: {
+            eventsByPersistenceId: eventsByPersistenceId,
+            highestSequenceNumber: highestSequenceNumber,
+            persistEvent: persistEvent
         },
-        currentPersistenceIdsAsync: (cb) => {
-            return persistenceIdsIndex.currentPersistenceIdsAsync(cb);
-        },
-        livePersistenceIds: () => {
-            return persistenceIdsIndex.livePersistenceIds();
-        }
+        persistenceIds: persistenceIdsIndex
     }
 
 }
