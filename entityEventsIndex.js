@@ -18,7 +18,7 @@ module.exports = (sbot, myKey) => {
             const author = message.value.author;
             const persistenceId = message.value.content.persistenceId;
             const sequenceNr = message.value.content.sequenceNr;
-            
+
             const part = message.value.content.part || 1;
 
             return [[author, persistenceId, sequenceNr, part]];
@@ -43,7 +43,7 @@ module.exports = (sbot, myKey) => {
 
         let windowing = false;
 
-        return window(function(_, cb) {
+        return window(function (_, cb) {
 
             if (windowing) return;
             windowing = true;
@@ -51,8 +51,8 @@ module.exports = (sbot, myKey) => {
             let parts = [];
 
             return function (end, data) {
-                
-                if (end && parts.length > 0) { 
+
+                if (end && parts.length > 0) {
                     const lastPart = parts[parts.length - 1];
 
                     // If we haven't replicated the rest of the parts for the message,
@@ -65,7 +65,7 @@ module.exports = (sbot, myKey) => {
                     }
                 }
                 else if (end) return cb(null, data);
-                else if (!data.part) { 
+                else if (!data.part) {
                     cb(null, data);
                     windowing = false;
                 }
@@ -78,7 +78,7 @@ module.exports = (sbot, myKey) => {
                     parts.push(data);
                 }
             }
-        }, function( start, data) {
+        }, function (start, data) {
             return data;
         });
     }
@@ -90,7 +90,7 @@ module.exports = (sbot, myKey) => {
         const fullPayload = payloads.join('');
 
         const full = parts[0];
-        
+
         if (full.encrypted) {
             // Encrypted payloads are base64 strings until they're decrypted later in the
             // pipeline
@@ -99,7 +99,7 @@ module.exports = (sbot, myKey) => {
             // Make it into an object again now that the string is joined up.
             full.payload = JSON.parse(fullPayload);
         }
-        
+
         return full;
     }
 
@@ -107,8 +107,8 @@ module.exports = (sbot, myKey) => {
 
         const source = eventsByPersistenceId(authorId, persistenceId, 0, undefined);
 
-        pull(source, pull.collect( (err, result) => {
-        
+        pull(source, pull.collect((err, result) => {
+
             if (err) {
                 cb(err);
             } else if (result.length === 0) {
@@ -121,7 +121,29 @@ module.exports = (sbot, myKey) => {
         }));
     }
 
+    function allEventsForAuthor(authorId, opts) {
+        authorId = authorId || myKey;
+
+        const source = sbot.query.read({
+            query: [
+              {$filter: {
+                value: {
+                    author: authorId,
+                    content: { 
+                        type: 'akka-persistence-message'
+                    }
+                }
+              }}
+            ]
+          });
+
+        return pull(source, pull.map(result => { 
+            return result.value.content 
+        }), reAssemblePartsThrough());
+    }
+
     return {
+        allEventsForAuthor,
         eventsByPersistenceId,
         highestSequenceNumber
     }

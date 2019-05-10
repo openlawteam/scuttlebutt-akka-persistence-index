@@ -16,7 +16,8 @@
     "pull-window": "^2.1.4",
     "pull-zip": "^2.0.1",
     "ramda": "^0.26.1",
-    "ssb-keys": "^7.1.5"
+    "ssb-keys": "^7.1.5",
+    "ssb-query": "^2.3.0"
   },
   "devDependencies": {
     "ssb-private": "^0.2.3",

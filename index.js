@@ -9,6 +9,8 @@ const AccessIndex = require('./auth/index');
 
 const Defer = require('pull-defer')
 
+const takeRange = require('./util').takeRange;
+
 exports.name = 'akka-persistence-index'
 
 exports.version = require('./package.json').version
@@ -25,7 +27,8 @@ exports.manifest = {
     events: {
         eventsByPersistenceId: 'source',
         highestSequenceNumber: 'async',
-        persistEvent: 'async'
+        persistEvent: 'async',
+        allEventsForAuthor: 'source'
     }
 }
 
@@ -340,11 +343,35 @@ exports.init = (ssb, config) => {
         });
     }
 
+    function allEventsForAuthor(author, opts) {
+        const source = pull(entityEventsIndex.allEventsForAuthor(author), 
+            pull.asyncMap ((item, cb) => {
+                if (!item.encrypted) {
+                    cb(null, item);
+                } else {
+                    accessIndex.getAllKeysFor(item.persistenceId, author).then(keyList => {
+                        if (keyList.length > 0) {
+                            return decrypt(keyList, item);
+                        } else {
+                            // We don't have access, so filter it out at the next stage
+                            return null;
+                        }
+                    }).asCallback(cb);
+                }
+
+            }),
+            pull.filter(result => result != null)
+        );
+
+        return takeRange(source, opts.start || 0, opts.end);
+    }
+
     return {
         events: {
             eventsByPersistenceId: eventsByPersistenceId,
             highestSequenceNumber: highestSequenceNumber,
-            persistEvent: persistEvent
+            persistEvent: persistEvent,
+            allEventsForAuthor: allEventsForAuthor
         },
         persistenceIds: persistenceIdsIndex
     }

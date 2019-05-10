@@ -1,6 +1,7 @@
 const FlumeviewLevel = require('flumeview-level');
 const pull = require('pull-stream');
-const zip  = require('pull-zip')
+
+const takeRange = require('./util').takeRange;
 
 const isPersistenceMessage = require('./util').isPersistenceMessage;
 
@@ -50,28 +51,6 @@ module.exports = (ssb, myKey, keysIndex) => {
         }), pull.map(value => {
             return value.value.value.content.persistenceId;
         }));
-    }
-
-    function takeRange(stream, start, end) {
-        start = start || 0;
-
-        let i = -1;
-        const infiniteStream = pull.infinite(() => {
-            i = i + 1;
-            return i;
-        });
-
-        return pull(
-            zip([infiniteStream, stream]),
-            pull.filter(item => item[0] >= start),
-            pull.take(result => {
-                const current = result[0];
-                
-                const item = result[1];
-                return item && (current < end || !end);
-            }),
-            pull.map(result => result[1])
-        );
     }
 
     return {

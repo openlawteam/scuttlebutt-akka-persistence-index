@@ -24,7 +24,9 @@ function createSbot(testBotName, keys) {
 
     var makeSbot = CreateTestSbot.use(
         require('ssb-private')
-    ).use(require('../index'))
+    )
+    .use(        require('ssb-query')    )
+    .use(require('../index'))
 
     const tempSbot = makeSbot({name: testBotName, keys});
 
@@ -49,6 +51,12 @@ describe("Entity events index", function() {
                         assert.fail(err);
                     } else {
                         assert(100, result.length, 100);
+
+                        result.forEach((item, iteration) => {
+                            assert.equal(item.sequenceNr, iteration + 1, "The result list should be ordered.");
+
+                        })
+
                     }
 
                     sbot.close()
@@ -217,10 +225,59 @@ describe("Entity events index", function() {
 
     });
 
+    describe("Can get all the events for an author", function () {
+
+        const sbot = createSbot("test9", pietKeys);
+
+        postTestMessages(sbot, "sample-id-7").then( () => {
+            const source = sbot.akkaPersistenceIndex.events.allEventsForAuthor('@' + pietKeys.public, {
+                start: 0,
+                end: 10
+            });
+
+            pull(source, pull.collect((err, result) => {
+                assert.equal(result.length, 10, "There should be 10 results")
+
+                result.forEach((item, num) => {
+                    assert.equal(item.sequenceNr, num + 1, "Should have expected sequence number.")
+                })
+
+                const source2 = sbot.akkaPersistenceIndex.events.allEventsForAuthor('@' + pietKeys.public, {
+                    start: 11,
+                    end: 21
+                });
+    
+                pull(source2, pull.collect((err, result) => {
+                    assert.equal(result.length, 10, "There should be 10 results");
+    
+                    result.forEach((item, num) => {
+                        assert.equal(item.sequenceNr, num + 12, "Should have the expected sequence number.")
+                    });
+        
+                }))
+
+                const source3 = sbot.akkaPersistenceIndex.events.allEventsForAuthor('@' + pietKeys.public, {
+                    start: 11000,
+                    end: 21000
+                });
+
+                pull(source3, pull.collect((err, result) => {
+                    assert.equal(result.length, 0, "Should have no items");
+
+                    sbot.close();
+                }))
+
+            }));
+
+        });
+
+    });
+
 
 });
 
-function postTestMessages(sbot) {
+function postTestMessages(sbot, persistenceId) {
+    persistenceId = persistenceId || "sample-id-6";
 
     var postMessage = bluebird.promisify(sbot.publish);
 
