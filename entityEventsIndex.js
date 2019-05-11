@@ -121,13 +121,14 @@ module.exports = (sbot, myKey) => {
         }));
     }
 
-    function allEventsForAuthor(authorId, opts) {
+    function allEventsForAuthor(authorId, startSequenceNr) {
         authorId = authorId || myKey;
 
         const source = sbot.query.read({
             query: [
               {$filter: {
                 value: {
+                    sequence: {$gt: startSequenceNr},
                     author: authorId,
                     content: { 
                         type: 'akka-persistence-message'
@@ -137,8 +138,10 @@ module.exports = (sbot, myKey) => {
             ]
           });
 
-        return pull(source, pull.map(result => { 
-            return result.value.content 
+        return pull(source, pull.map(item => { 
+            const result = item.value.content;
+            result['scuttlebuttSequence'] = item.value.sequence;
+            return result;
         }), reAssemblePartsThrough());
     }
 

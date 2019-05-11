@@ -344,7 +344,10 @@ exports.init = (ssb, config) => {
     }
 
     function allEventsForAuthor(author, opts) {
-        const source = pull(entityEventsIndex.allEventsForAuthor(author), 
+        const start = opts.start;
+        const end = opts.end;
+
+        const source = pull(entityEventsIndex.allEventsForAuthor(author, start), 
             pull.asyncMap ((item, cb) => {
                 if (!item.encrypted) {
                     cb(null, item);
@@ -363,7 +366,7 @@ exports.init = (ssb, config) => {
             pull.filter(result => result != null)
         );
 
-        return takeRange(source, opts.start || 0, opts.end);
+        return pull(source, pull.take(end - start));
     }
 
     return {
