@@ -128,7 +128,7 @@ module.exports = (sbot, myKey) => {
             query: [
               {$filter: {
                 value: {
-                    sequence: {$gt: startSequenceNr},
+                    sequence: {$gte: startSequenceNr},
                     author: authorId,
                     content: { 
                         type: 'akka-persistence-message'
