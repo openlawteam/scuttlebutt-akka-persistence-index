@@ -194,7 +194,7 @@ module.exports = (ssb, myKey, keysIndex) => {
                     keys: true
                 }),
                 pull.filter(item => {
-                    return item.key[0].startsWith('@');
+                    return item.key[0].startsWith('@') && item.key[0] !== myKey;
                 }),
                 pull.map(item => {
                     return item.key[0];
