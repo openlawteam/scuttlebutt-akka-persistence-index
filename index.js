@@ -22,7 +22,7 @@ exports.manifest = {
         myLivePersistenceIds: 'source',
         authorsForPersistenceId: 'source',
         persistenceIdsForAuthor: 'source',
-        allAuthors: 'source',
+        allOtherAuthors: 'source',
     },
     events: {
         eventsByPersistenceId: 'source',

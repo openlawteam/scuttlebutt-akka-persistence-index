@@ -183,7 +183,7 @@ module.exports = (ssb, myKey, keysIndex) => {
             }
 
         },
-        allAuthors: (opts) => {
+        allOtherAuthors: (opts) => {
             opts = opts || {};
 
             const source = pull(

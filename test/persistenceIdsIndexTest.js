@@ -117,13 +117,14 @@ describe("Test persistence IDs indexing functionality", function () {
 
         postsMade.then(() => {
 
-            const source = sbot.akkaPersistenceIndex.persistenceIds.allAuthors();
+            const source = sbot.akkaPersistenceIndex.persistenceIds.allOtherAuthors();
 
             pull(source, pull.collect((err, result) => {
                 if (err) {
                     assert.fail(err);
                 } else {
-                    assert(result.length, 1, "There should only be one result");
+                    // TODO: make it easier to test with multiple authors so that this unit test is better
+                    assert.equal(result.length, 0, "There should only be 0 results");
                 }
 
                 sbot.close();
