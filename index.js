@@ -192,12 +192,7 @@ exports.init = (ssb, config) => {
         
             if (persistedMessage.manifest === constants.setKeyType) {
 
-                generateKeyBase64().then(key => {
-
-                    const keyInfo = {
-                        key: key,
-                        nonceLength: 8
-                    }
+                generateKeyBase64().then(keyInfo => {
                     
                     return accessIndex.sendUpdatedKey(
                         persistedMessage.persistenceId,
@@ -223,17 +218,16 @@ exports.init = (ssb, config) => {
             } else if (persistedMessage.manifest === constants.removeUserType) {
                 const userId = persistedMessage.payload.userId;
                 const persistenceId = persistedMessage.persistenceId;
-                const newKey = persistedMessage.payload.newKey;
                 const sequenceNr = persistedMessage.sequenceNr;
                 
-                // Todo: validate the above fields aren't null.
-
-                accessIndex.trackRemoveUser(persistenceId, userId)
+                generateKeyBase64().then(newKey => {
+                    accessIndex.trackRemoveUser(persistenceId, userId)
                     .then(() =>
                         accessIndex.sendUpdatedKey(persistenceId, sequenceNr, newKey)
                     ).then(
                         () => publishWithKey(persistedMessage)
                     ).asCallback(cb);
+                });
     
             } else {
                 publishWithKey(persistedMessage).asCallback(cb);
@@ -340,6 +334,11 @@ exports.init = (ssb, config) => {
             const salt = randomBytes[1];
 
             return pbkdf2(encryptionKey, salt, 10000, 32, 'sha512').then(buffer => buffer.toString('base64'));
+        }).then(key => {
+            return {
+                key: key,
+                nonceLength: 8
+            }
         });
     }
 
