@@ -27,16 +27,20 @@ module.exports = (sbot, myKey) => {
         }
     }
 
-    function eventsByPersistenceId(authorId, persistenceId, fromSequenceNumber, toSequenceNumber) {
+    function eventsByPersistenceId(authorId, persistenceId, fromSequenceNumber, toSequenceNumber, live) {
+        
         const source = index.read({
             keys: true,
             gte: [authorId, persistenceId, fromSequenceNumber, null],
-            lte: [authorId, persistenceId, toSequenceNumber, undefined]
+            lte: [authorId, persistenceId, toSequenceNumber, undefined],
+            live: live,
+            sync: false
         });
 
         return pull(source, pull.map(msg => {
             return msg.value.value.content
-        }), reAssemblePartsThrough());
+        }), reAssemblePartsThrough()
+        );
     }
 
     function reAssemblePartsThrough() {

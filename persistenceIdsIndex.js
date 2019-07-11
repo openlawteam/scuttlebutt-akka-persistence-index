@@ -50,7 +50,7 @@ module.exports = (ssb, myKey, keysIndex) => {
             live
         }), pull.map(value => {
             return value.value.value.content.persistenceId;
-        }));
+        }), pull.unique());
     }
 
     return {

@@ -251,7 +251,7 @@ describe("Entity events index", function() {
                     assert.equal(result.length, 10, "There should be 10 results");
     
                     result.forEach((item, num) => {
-                        assert.equal(item.sequenceNr, num + 12, "Should have the expected sequence number.")
+                        assert.equal(item.sequenceNr, num + 11, "Should have the expected sequence number.")
                     });
         
                 }))

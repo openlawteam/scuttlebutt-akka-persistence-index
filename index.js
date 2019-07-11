@@ -58,12 +58,13 @@ exports.init = (ssb, config) => {
      * @param {*} persistenceId the peristence ID of the entity
      * @param {*} fromSequenceNumber the start sequence number to stream from
      * @param {*} toSequenceNumber the maximum sequence number to stream up to (stream ends early if the last item has a smaller
+     * @param {*} live a boolean that determines if the stream remains open if the toSequenceNumber has not yet been reached
      * sequence number than this.)
      */
-    function eventsByPersistenceId(authorId, persistenceId, fromSequenceNumber, toSequenceNumber) {
+    function eventsByPersistenceId(authorId, persistenceId, fromSequenceNumber, toSequenceNumber, live) {
         authorId = authorId || '@' + config.keys.public;
 
-        const encryptedSource = entityEventsIndex.eventsByPersistenceId(authorId, persistenceId, fromSequenceNumber, toSequenceNumber);
+        const encryptedSource = entityEventsIndex.eventsByPersistenceId(authorId, persistenceId, fromSequenceNumber, toSequenceNumber, live);
 
         const decryptionThrough = Defer.through();
 
