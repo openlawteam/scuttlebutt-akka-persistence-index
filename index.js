@@ -360,6 +360,8 @@ exports.init = (ssb, config) => {
         const start = opts.start;
         const end = opts.end;
 
+        author = author || '@' + config.keys.public;
+
         const source = pull(entityEventsIndex.allEventsForAuthor(author, start), 
             pull.asyncMap ((item, cb) => {
                 if (!item.encrypted) {
