@@ -45,10 +45,10 @@ exports.init = (ssb, config) => {
     const persistenceIdsIndex = PersistenceIdsIndex(ssb, '@' + config.keys.public, accessIndex);
 
     const publish = promisify(ssb.publish);
-
     const randomBytes = promisify(crypto.randomBytes);
-
     const pbkdf2 = promisify(crypto.pbkdf2);
+
+    const MESSAGE_PART_SIZE = 7200;
 
     /**
      * The decrypted stream of events persisted for the given entity ID, up to the last sequence number visible
@@ -250,7 +250,7 @@ exports.init = (ssb, config) => {
 
         // The maximum size of one full scuttlebutt message is 8192 bytes, so we need to split large payloads
         // over multiple parts
-        if (bytes >= 7200) {
+        if (bytes >= MESSAGE_PART_SIZE) {
 
             const buffer = Buffer.from(stringRepresentation, 'utf8');
             const parts = breakIntoParts(buffer, 7200);
@@ -279,7 +279,20 @@ exports.init = (ssb, config) => {
         let i = 0;
     
         while (i < length) {
-            parts.push(buffer.slice(i, i += chunkSize));
+            const candidateSlice = buffer.slice(i, i + chunkSize);
+
+            // Unfortunately, the message length is calculated by the JSON encoded version of the ssb message
+            // so we have to encode it to JSON first to check if escape characters, etc, have padded out the length
+            // https://github.com/ssbc/ssb-validate/blob/005dd1aaf0468b5310123ed347bc2432c1e73463/index.js#L106
+            const length = JSON.stringify(candidateSlice.toString('utf-8')).length;
+
+            if (length > MESSAGE_PART_SIZE) {
+                const sliceTo = MESSAGE_PART_SIZE - (length - MESSAGE_PART_SIZE);
+                parts.push(buffer.slice(i, i += sliceTo));
+            } else {
+                parts.push(candidateSlice);
+                i += chunkSize;
+            }
         }
     
         return parts;

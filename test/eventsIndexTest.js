@@ -113,6 +113,27 @@ describe("Entity events index", function() {
         });
     })
 
+    describe('Re-assembles parts properly from a large template', function() {
+        const template = require('./data/model_contract.json');
+
+        const sbot = createSbot("test11", pietKeys);
+
+        sbot.akkaPersistenceIndex.events.persistEvent(template, (err, result) => {
+            console.log(err);
+            assert.equal(err, null, "Err should be null.");
+            
+            pull(
+                sbot.akkaPersistenceIndex.events.eventsByPersistenceId(pietPubWithPrefix, template.persistenceId, 0, 100),
+                pull.collect((err, result) => {
+                    assert.equal(result.length, 1, "There should only be one result.");
+                    assert.equal(result[0].payload.content, template.payload.content, "Should be re-assembled to the same result.");
+                    sbot.close()
+                })
+            );
+        })
+
+    });
+
     describe('A message in some parts followed by a whole message followed by parts results in 3 messages', function () {
         const sbot = createSbot("test6", pietKeys);
         
