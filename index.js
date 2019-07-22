@@ -253,7 +253,7 @@ exports.init = (ssb, config) => {
         if (bytes >= MESSAGE_PART_SIZE) {
 
             const buffer = Buffer.from(stringRepresentation, 'utf8');
-            const parts = breakIntoParts(buffer, 7200);
+            const parts = breakIntoParts(buffer, MESSAGE_PART_SIZE);
 
             const messages = parts.map((part, partNumber) => {
                 const cloned = Object.assign({}, message);
@@ -286,7 +286,7 @@ exports.init = (ssb, config) => {
             // https://github.com/ssbc/ssb-validate/blob/005dd1aaf0468b5310123ed347bc2432c1e73463/index.js#L106
             const length = JSON.stringify(candidateSlice.toString('utf-8')).length;
 
-            if (length > MESSAGE_PART_SIZE) {
+            if (length > chunkSize) {
                 const sliceTo = MESSAGE_PART_SIZE - (length - MESSAGE_PART_SIZE);
                 parts.push(buffer.slice(i, i += sliceTo));
             } else {
