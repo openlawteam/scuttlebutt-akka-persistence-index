@@ -142,11 +142,37 @@ module.exports = (sbot, myKey) => {
             ]
           });
 
-        return pull(source, pull.map(item => { 
-            const result = item.value.content;
-            result['scuttlebuttSequence'] = item.value.sequence;
-            return result;
-        }), reAssemblePartsThrough());
+        const isMidPart = ((item) => {
+            const isMid = item.value.content.part && (item.value.content.part < item.value.content.of);
+            return isMid; 
+        });
+
+        return pull(source, 
+            pull.filter(item => !isMidPart(item)),
+            pull.asyncMap((item, cb) => {
+
+                if (item.value.content.part) {
+                    // Emit the full item
+                    const sequenceNr = item.value.content.sequenceNr;
+
+                    pull(eventsByPersistenceId(authorId, item.value.content.persistenceId, sequenceNr, sequenceNr + 1), 
+                        pull.collect((err, results) => {
+                            console.log(item);
+                            console.log("CALLING BACK WITH FULL.")
+                            console.log(results[0]);
+
+                            console.log("item");
+                            console.log(item);
+                            cb(err, results[0])
+                        })
+                    )
+                } else {
+                    const result = item.value.content;
+                    result['scuttlebuttSequence'] = item.value.sequence;
+                    cb(null, result);
+                }
+
+        }));
     }
 
     return {
