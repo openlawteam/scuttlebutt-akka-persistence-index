@@ -157,12 +157,6 @@ module.exports = (sbot, myKey) => {
 
                     pull(eventsByPersistenceId(authorId, item.value.content.persistenceId, sequenceNr, sequenceNr + 1), 
                         pull.collect((err, results) => {
-                            console.log(item);
-                            console.log("CALLING BACK WITH FULL.")
-                            console.log(results[0]);
-
-                            console.log("item");
-                            console.log(item);
                             cb(err, results[0])
                         })
                     )
