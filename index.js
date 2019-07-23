@@ -246,26 +246,31 @@ exports.init = (ssb, config) => {
 
         const stringRepresentation = payloadIsString ? message.payload : JSON.stringify(message.payload);
 
-        const bytes = Buffer.byteLength(stringRepresentation, 'utf8');
+        // Unfortunately, the maximum message size in scuttlebutt is the JSON stringified version of the payload (including the signature),
+        // with a length of 8192 which means we have to be careful about how we split long messages
+        const doubleEncoded = JSON.stringify(stringRepresentation);
 
-        // The maximum size of one full scuttlebutt message is 8192 bytes, so we need to split large payloads
-        // over multiple parts
-        if (bytes >= MESSAGE_PART_SIZE) {
+        if (doubleEncoded.length >= MESSAGE_PART_SIZE) {
 
-            const buffer = Buffer.from(stringRepresentation, 'utf8');
-            const parts = breakIntoParts(buffer, MESSAGE_PART_SIZE);
+            const parts = breakIntoParts(stringRepresentation, MESSAGE_PART_SIZE);
 
             const messages = parts.map((part, partNumber) => {
                 const cloned = Object.assign({}, message);
 
                 cloned.part = partNumber + 1;
                 cloned.of = parts.length;
-                cloned.payload = part.toString('utf8');
+                cloned.payload = part;
 
                 return cloned;
             });
 
-            return Promise.all(messages.map(msg => publish(msg)));
+            // Publish the parts in order
+            var p = Promise.resolve();
+            messages.forEach(msg =>
+                p = p.then(() => publish(msg))
+            );
+            return p;
+
         } else {
             return publish(message);
         }
@@ -281,13 +286,13 @@ exports.init = (ssb, config) => {
         while (i < length) {
             const candidateSlice = buffer.slice(i, i + chunkSize);
 
-            // Unfortunately, the message length is calculated by the JSON encoded version of the ssb message
-            // so we have to encode it to JSON first to check if escape characters, etc, have padded out the length
-            // https://github.com/ssbc/ssb-validate/blob/005dd1aaf0468b5310123ed347bc2432c1e73463/index.js#L106
-            const length = JSON.stringify(candidateSlice.toString('utf-8')).length;
+            // The escaping of "\" in json inflates the length of the string during the ssb validation
+            const numberOfEscapes = JSON.stringify(candidateSlice).split("\\").length - 1;
 
+            const length = candidateSlice.length + numberOfEscapes
+            
             if (length > chunkSize) {
-                const sliceTo = MESSAGE_PART_SIZE - (length - MESSAGE_PART_SIZE);
+                const sliceTo = MESSAGE_PART_SIZE - numberOfEscapes;
                 parts.push(buffer.slice(i, i += sliceTo));
             } else {
                 parts.push(candidateSlice);
