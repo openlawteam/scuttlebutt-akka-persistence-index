@@ -38,7 +38,11 @@ module.exports = (sbot, myKey) => {
         });
 
         return pull(source, pull.map(msg => {
-            return msg.value.value.content
+            let content = msg.value.value.content
+
+            content['scuttlebuttSequence'] = msg.value.value.sequence;
+
+            return content
         }), reAssemblePartsThrough()
         );
     }
@@ -93,7 +97,7 @@ module.exports = (sbot, myKey) => {
 
         const fullPayload = payloads.join('');
 
-        const full = parts[0];
+        const full = parts[parts.length - 1];
 
         if (full.encrypted) {
             // Encrypted payloads are base64 strings until they're decrypted later in the
@@ -157,6 +161,8 @@ module.exports = (sbot, myKey) => {
 
                     pull(eventsByPersistenceId(authorId, item.value.content.persistenceId, sequenceNr, sequenceNr + 1), 
                         pull.collect((err, results) => {
+                            // Note: 'scuttlebuttSequence' is already included by the eventsByPersistenceId source.
+                            // It is the scuttlebutt sequence number of the last 'part' for the persisted entity event
                             cb(err, results[0])
                         })
                     )

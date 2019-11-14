@@ -75,7 +75,6 @@ exports.init = (ssb, config) => {
             decryptionThrough.resolve(through);
         });
 
-
         return pull(encryptedSource, decryptionThrough, pull.filter(decrypted => decrypted != null));
     }
 
