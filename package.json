@@ -21,7 +21,7 @@
   },
   "devDependencies": {
     "ssb-private": "^0.2.3",
-    "mocha": "^6.1.4",
+    "mocha": "^10.2.0",
     "scuttle-testbot": "^1.1.6"
   }
 }
